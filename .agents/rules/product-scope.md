@@ -14,7 +14,7 @@
 | 连接 | 单文档一个逻辑连接；打开时由人映射到本机 `connectionId`；SQLite / PostgreSQL 为认证候选 |
 | 数据 | 每条查询一条作者固定 SQL；数据库侧聚合；默认 500 行、最高 5000 行；手动刷新 |
 | 资产 | 本机 JSON 定义文件（打开/另存）；一个文档内 datasets / reports / dashboards |
-| 呈现 | 表格、柱状图、折线图、数值卡；一个看板最多 4 张报表 |
+| 呈现 | 表格、柱状图、折线图、数值卡；一个看板最多 4 张报表，在 12 列网格内自由拖拽/缩放（非像素级画布） |
 | 导出 | 当前已验证结果的 CSV；JSON 定义导出 |
 | AI | 可选：生成单报表候选 JSON，人工审阅、预览、确认后保存；不自动发布 |
 | 语言/主题 | 跟随宿主 locale 与主题；中英文文案 |
@@ -55,7 +55,12 @@
 | ADR-03 | AI 生成受限 JSON/SQL 候选，经 schema/字段/版本/语法检查，作者审阅 + `queryData` 预览后人工确认保存 | V4 达门槛且 V5 通过 → 可讨论更自动流程，仍需人工确认口径 |
 | ADR-04 | ProjectDocument JSON 是正式资产，经 `host.saveFile` 另存；打开需用户选文件/重新绑定；`host.storage` 只存偏好与有限草稿 | 用户拒绝文件式体验且接受新增宿主资产 API 成本 → 重新裁决 |
 
-### D1–D5：**待定**，会阻塞里程碑（`decisions.md:40-48`）
+### ADR-05 / ADR-06：**已定（2026-10-22）**（`decisions.md:38-52`）
+
+- ADR-05 技术栈：TypeScript 5.9 strict + Vue 3.5 + 自研轻量组件（宿主主题 token）+ Vite 8；单一前端包、无 sidecar、不引路由/状态库。版本与逐项理由见 `docs/development/tech-stack.md`（TS-01~17）。
+- ADR-06 看板布局：`layout` 只存 12 列网格坐标 `{reportId,x,y,w,h}`；编辑用自研 Pointer Events + CSS Grid（拖拽/缩放/碰撞推挤），不引布局引擎；像素级自由画布不做（跨机器不可移植，对 ≤4 卡过重）。理由见 `tech-stack.md` §4.10、实现约束见 `architecture.md` §8.1。
+
+### D1–D5：**待定**，会阻塞里程碑（`decisions.md:54-64`）
 
 | ID | 决策 | 建议默认 | 决策门时点 |
 |---|---|---|---|
@@ -65,9 +70,9 @@
 | D4 | 首发数据库与规模 | SQLite/PostgreSQL；≤4 卡、手动刷新、5000 返回行 | M1 范围冻结前 |
 | D5 | 数据与依赖许可政策 | 无业务行持久化/外发；SPDX/NOTICE | 发布前 |
 
-**未拍板时的行动约束**：可以做 M0（不影响范围的技术验证），**不得对外承诺 MVP 或排期 M1+**（`decisions.md:48`、`roadmap.md:41`）。
+**未拍板时的行动约束**：可以做 M0（不影响范围的技术验证），**不得对外承诺 MVP 或排期 M1+**（`decisions.md:64`、`roadmap.md:41`）。
 
-### 评审已确认 5 条（2026-10-22，`decisions.md:50-58`，"仍以 ADR 为准"）
+### 评审已确认 5 条（2026-10-22，`decisions.md:66-74`，"仍以 ADR 为准"）
 
 1. 边界由宿主硬限制反推，不靠竞品功能清单；证据抽查 10 处与 `b160d130` 一致。
 2. 先做 walking skeleton，再"单报表竖切"；看板、AI、PostgreSQL 后置。
@@ -85,7 +90,7 @@
 - 已知矛盾（需在对应文档修正，不在代码里二选一）：
   1. 155 项宿主契约测试：`feasibility-report.md:199,227` 写"本轮实际执行通过"，`assessment.md:37` 写"本轮未重跑"——引用时必须带"2026-10-22 实测"或重跑。
   2. 首切片字段名 `connectionAlias`（`first-slice.md:57`）与冻结 schema 的 `sourceAliases[]`（`data-model.md:15-17`）不一致。
-  3. 默认文件名 `report.json`（`first-slice.md:58`）与 `<slug>.dbxreport.json`（`architecture.md:125`）不一致。
+  3. 默认文件名 `report.json`（`first-slice.md:58`）与 `<slug>.dbxreport.json`（`architecture.md:135`）不一致。
   4. M0 重开路径依赖 `host.openFilesystem`/拖入，但首版不申请 `host.filesystem` 且没有读取 API（`first-slice.md:22` vs `capabilities.md:112`）。
   5. M1 退出条件 V8 是否属于门槛未统一（`roadmap.md:12` vs `test-strategy.md:110`）。
   6. V5 标 "M4+" 但 M4 范围/验收无 V5 条目。

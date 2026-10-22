@@ -62,9 +62,10 @@
 ## 5. 决策状态（必须原样保留）
 
 - ADR-01~04：**暂定**（SQL 为计算真相；作者写/审 SQL；AI 候选 + 人工确认；本机 JSON 为资产）。`docs/product/decisions.md:6-36`。
-- ADR-05：**已定（2026-10-22）** 技术栈 TypeScript + Vue 3.5 + 自研轻量组件 + Vite 8，单一前端包、无 sidecar、不引路由/状态库；版本基线 `docs/development/tech-stack.md:123-149`。
+- ADR-05：**已定（2026-10-22）** 技术栈 TypeScript + Vue 3.5 + 自研轻量组件 + Vite 8，单一前端包、无 sidecar、不引路由/状态库；版本基线 `docs/development/tech-stack.md:138-164`。
+- ADR-06：**已定（2026-10-22）** 看板布局用 12 列网格吸附 + 自研 Pointer Events/CSS Grid 拖拽；像素级自由画布与布局引擎不做（`docs/product/decisions.md:46-52`、`tech-stack.md` TS-17、`architecture.md` §8.1）。
 - D1–D5：**待定**，会阻塞里程碑（目标用户 SQL 能力、文件式资产、AI 边界、首发库/规模、数据与许可政策）。决策门：D1/D2 进 M1 前，D4 M1 范围冻结前，D3 进 M3 前，D5 发布前（`roadmap.md:35-39`）。
-- **未拍板约束**：可以做 M0（不影响范围的技术验证），不得对外承诺 MVP 或排期 M1+（`decisions.md:56`、`roadmap.md:41`）。
+- **未拍板约束**：可以做 M0（不影响范围的技术验证），不得对外承诺 MVP 或排期 M1+（`decisions.md:64`、`roadmap.md:41`）。
 - 命名 `io.dbx.report` 是建议方案，未向 `t8y2/dbx-store` 确认；manifest id 发布后不可改。
 - MVP 承诺表含折线图/数值卡，但 M1 只做 table/bar——属后续里程碑补齐，不得在 M1 宣称 MVP 达成。
 
@@ -124,7 +125,7 @@
 
 1. 读 `.agents/rules/`（至少 `plugin-contract.md`、`data-and-security.md`；做产品取舍再读 `product-scope.md`）与 `docs/development/first-slice.md`。
 2. 只在 M0 范围内实现最小 UI-only workbench：打开 → 执行固定 SQL → 渲染 → 另存 JSON → 重开 → 再执行。
-3. 按 `docs/development/tech-stack.md`（TS-01~16）初始化工程：`dbx-plugin create dbx-report --template frontend` 生成 manifest/assets/打包配置，前端用 Vite + Vue 自建（`src/` → `ui/`）；`dbx-plugin dev` 迭代 UI（Node 22+，dev-host 无数据 API）；`dbx-plugin package` 出未签名 `.dbxp`。
+3. 按 `docs/development/tech-stack.md`（TS-01~17）初始化工程：`dbx-plugin create dbx-report --template frontend` 生成 manifest/assets/打包配置，前端用 Vite + Vue 自建（`src/` → `ui/`）；`dbx-plugin dev` 迭代 UI（Node 22+，dev-host 无数据 API）；`dbx-plugin package` 出未签名 `.dbxp`。
 4. 真机：插件中心开启「Allow unsigned development packages」→ 本地安装 → 过真机检查点（`window.dbxPlugin`、`capabilities.dataApi`、授权弹框、取消保存、无 CSP/postMessage 报错）。
 5. 记录 `docs/development/records/<date>-m0.md`（环境、命令、脱敏截图、错误、图表库结论、go/no-go）；更新 roadmap 状态与 acceptance 签收。
 6. 需要平台操作细节时读 `.agents/skills/dbx-plugin-dev/`；查 DBX 数据库用 `.agents/skills/dbx/`。

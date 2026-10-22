@@ -16,7 +16,7 @@
 | TS-06 | 状态管理 | `reactive`/`shallowRef` + composable / 纯 TS 状态机，不引 Pinia | 已定 |
 | TS-07 | 文档与数据校验 | Zod 4：schema 即类型真相，另导出 JSON Schema 给 `data-model.md` | 已定 |
 | TS-08 | 哈希与规范化 | 自写 canonical JSON + `@noble/hashes` sha256 | 已定 |
-| TS-09 | 图表 | ECharts 6 按需注册（bar/line + canvas），M0 实测 CSP/体积 | 暂定（M0 决策） |
+| TS-09 | 图表 | ECharts 6.1.0 按需注册（bar/line + canvas）+ `vue-echarts@8`；主题切换依赖 v6 `setTheme`，不得降级到 5 | 暂定（M0 决策） |
 | TS-10 | 表格 | 自研语义化表格；M1 不引 TanStack | 已定（M1 后复议） |
 | TS-11 | 测试 | Vitest 5 + happy-dom + `@vue/test-utils`；真机 E2E 手工 | 已定 |
 | TS-12 | 规范工具 | ESLint 10 flat + typescript-eslint 8 + eslint-plugin-vue 10 + Prettier 3 | 已定 |
@@ -24,6 +24,7 @@
 | TS-14 | i18n | 自研 typed 字典（zh-CN/en），日期数字只用 `Intl` | 已定 |
 | TS-15 | 图标/字体 | 内联 SVG 组件 + 系统字体栈；无 icon 包、无字体文件、无 CDN | 已定 |
 | TS-16 | 包管理与 CI | pnpm 12 + GitHub Actions；发布用官方 release 模板 | 已定 |
+| TS-17 | 看板画布 | 12 列网格吸附；拖拽/缩放/碰撞自研 Pointer Events + CSS Grid，不引布局引擎 | 已定（M2 实现） |
 
 ## 1. 语言与运行时
 
@@ -67,10 +68,12 @@
 ### 4.1 图表：ECharts 6.1.0（TS-09，M0 定稿）
 
 - 按需注册：`echarts/core` + `BarChart`/`LineChart` + `CanvasRenderer` + `GridComponent`/`TooltipComponent`/`LegendComponent`；`vue-echarts@8` 做容器与 resize/主题胶水。
+- **版本约束**：`vue-echarts@8` 的主题变更调用 `instance.setTheme()`（ECharts 6 新增；v5 换主题只能 `dispose` 后重建），所以图表实现**不得降级到 ECharts 5**，升降级都过 §8。
+- 体积参考（2026-10-22 本地 esbuild `--minify` + gzip -9 实测）：按需注册的 ECharts 6 为 542 KB min / 180 KB gzip；M0 仍以真实插件包在 `default-src 'none'` 下复测为准。
 - 为什么：Apache-2.0；canvas 渲染无需 DOM 测量混入；中文文档与主题能力最好；无 eval、无 worker 依赖。
 - 体积目标：单图场景 chunk < 400 KB（gzip 前）；超 [architecture.md](architecture.md) §11 包体积预算需评审。
 - 退化路径：CSP 拦截或体积不可接受 → 手写 SVG 柱/折线/数值卡（≤150 行），先做 bar 再补 line。
-- 否决：Vega-Lite（可视化语法全家桶，超出需求）、Chart.js（主题与大数据降采样弱）、ECharts 全量包（体积）。
+- 否决：Vega-Lite（可视化语法全家桶，且 CSP 下默认表达式需 vega-interpreter，超出需求）、Chart.js（主题与大数据降采样弱）、uPlot（只擅长时序折线/面积，柱状需自绘）、ApexCharts（license 字段非明确 SPDX）、Highcharts（专有许可）、Plotly（包 98 MB 量级）、AntV G2（体积与代际变动大、无额外收益）、ECharts 全量包（体积）。
 
 ### 4.2 表格：自研 `<DataTable>`（TS-10）
 
@@ -120,6 +123,18 @@
 - pnpm 12，提交 `pnpm-lock.yaml`；`engines.node >= 22.12`。
 - GitHub Actions：`typecheck` / `lint` / `test` / `build` 四步；发布用官方模板 `templates/common/github/plugin-release.yml` 生成 unsigned universal 候选，签名在 DBX Store 侧完成，不本地签。
 
+### 4.10 看板画布与拖拽布局（TS-17，M2 实现）
+
+- 坐标模型：12 列网格，`layout[]` 存格坐标（`x,y,w,h`）而非像素；列宽由容器自适应，行高 40 px、gap 12 px 是 UI 常量，不写入资产。最小卡片 3×4 格，`x+w≤12`。
+- 交互：卡片标题栏拖动；右下角 + 右/下边中点缩放；过半格才吸附；碰撞向下推挤 + 向上收缩，禁止重叠；编辑模式才可拖拽，阅读模式只渲染。
+- 键盘/无障碍：卡片 focus 后 `Alt+方向` 移动、`Alt+Shift+方向` 缩放；保留 `x/y/w/h` 表单输入作为等价入口（无指针设备兜底）。
+- 实现：自研 Pointer Events + CSS Grid（约 400–600 行），不引布局引擎：
+  - gridstack 14（无依赖，实测 92 KB min / 25 KB gzip）是 DOM 所有权型库，自己移动节点写 inline style，与 Vue 渲染冲突，需要桥接层；
+  - grid-layout-plus 1.1.1 额外拖入 interactjs + @vexip-ui 两包，且是社区 fork；
+  - 升级触发条件：卡片 >8、需要嵌套布局/多断点/触屏惯性拖拽 → 评估 gridstack，数据模型不变。
+- 性能：拖拽/缩放期间暂停图表 resize（`vue-echarts` 的 100 ms autoresize 也要禁用），`pointerup` 后统一 resize 一次，避免每帧 `chart.resize()`。
+- 持久化：只存 `layout` 数值；不存像素坐标、不存渲染结果。
+
 ## 5. 版本基线（2026-10-22 快照）
 
 | 包 | 版本 | 用途 |
@@ -162,6 +177,8 @@
 | vue-router / Pinia | 单页单文档，状态规模不足以支撑；YAGNI |
 | 远程字体/图标/CDN | CSP + 无网络硬边界；包必须自包含 |
 | Vega-Lite / D3 全量 | 可视化语法与绘图能力远超需求，体积/学习成本不划算 |
+| 像素级自由画布（PPT/PDF 式绝对定位） | 资产绑定容器宽度、跨机器不可移植；重叠/遮挡无法静态校验；≤4 卡收益低 |
+| 布局引擎（gridstack / grid-layout-plus，当前不引） | 嵌套/多断点/触屏能力用不上；DOM 所有权与 Vue 冲突，或多 3 个依赖；保留为需求扩张后的升级项 |
 
 ## 7. M0 必须验证的假设（H）
 
@@ -183,3 +200,4 @@
 | 日期 | 变更 | 理由 |
 |---|---|---|
 | 2026-10-22 | v1：Vue 3.5 + TS 5.9 + Vite 8 + 自研组件 + ECharts 6（M0 定稿） | 与既有 Vue 安全论证一致；官方允许 self-managed Vue；避免 UI 套件与主题 token 双体系 |
+| 2026-10-22 | v1.1：新增 TS-17 画布（12 列网格 + 自研拖拽）；TS-09 补 `setTheme` 版本约束与实测体积 | 确认"可自由拖拽布局"需求；像素画布跨机器不可移植，布局引擎对 ≤4 卡过重 |

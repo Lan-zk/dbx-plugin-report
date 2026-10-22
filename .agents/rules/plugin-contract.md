@@ -31,7 +31,7 @@
 ## 4. UI 沙箱
 
 - iframe `sandbox="allow-scripts"`、opaque origin、CSP `default-src 'none'`；`connect-src` 只含声明的 https origin；无 Tauri、无父 DOM、无直接网络、无 Node。
-- 无 worker / 嵌套 iframe / form；`eval`/`new Function` 仅图形引擎可选开启——**本项目不使用**（`docs/testing/test-strategy.md:95-96`、`docs/development/architecture.md:161`）。
+- 无 worker / 嵌套 iframe / form；`eval`/`new Function` 仅图形引擎可选开启——**本项目不使用**（`docs/testing/test-strategy.md:95-96`、`docs/development/tech-stack.md:64`、`docs/development/architecture.md:160-167`）。
 - `localStorage`/`sessionStorage` 抛异常 → 用 `window.dbxPlugin.storage`。
 - 构建产物相对路径（Vite `base: "./"`）；`<link rel=stylesheet>` 被改写为 `<style>`，`disabled` 丢失；`requestFullscreen` 需先探测。
 - UI 资源 `readAsset`/`readAssetUrl` 单个 ≤32 MiB；JSON/binary 消息分别 ≤8 MiB / 64 MiB，超限宿主断连。

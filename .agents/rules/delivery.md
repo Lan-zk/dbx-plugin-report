@@ -77,7 +77,7 @@ cargo test -p dbx-mcp plugin_tools
 - 验收签收字段（`acceptance.md:83-91`）：里程碑 / 日期 / 执行人 / 环境 / 结果（通过·有条件通过·不通过）/ 逐项证据 / 遗留问题 / 决定 / 签名。
 - 日志只输出 code/耗时/行数/截断标记；不输出 SQL 字面量、结果值、连接串、token。
 
-## 8. 文档维护（`docs/README.md:63-68` + `decisions.md:4`）
+## 8. 文档维护（`docs/README.md:64-70` + `decisions.md:4`）
 
 1. DBX Host API/权限/限制变化 → 更新 `docs/host/` 与 `docs/analysis/evidence-index.md`，并更新 `docs/README.md` 基线 commit。
 2. 范围变化 → 先改 `docs/product/decisions.md`（新增 ADR 或修订待拍板项），再改 `docs/development/roadmap.md`；禁止在里程碑里悄悄扩大范围。

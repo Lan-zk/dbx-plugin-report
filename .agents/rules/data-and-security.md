@@ -22,7 +22,7 @@
 
 - 授权：`host.data:read` + 每（插件, 连接）用户授权；首次查询弹宿主对话框点名插件与连接；拒绝记在本 workbench 会话；每次查询后端重校验；撤销返回 `PLUGIN_DATA_ACCESS_NOT_GRANTED: …`。
 - **禁止**用 `LIMIT` 分批绕 5000 行上限；`truncated=true` 不提供总行数或原因（`capabilities.md:82`）。
-- 插件并发上限：文档内查询队列 2；同一 dataset 新请求 generation+1 并丢弃旧响应；看板顺序队列 ≤2；排队中显示"排队中"，禁止隐式定时刷新（`architecture.md:87-91`）。
+- 插件并发上限：文档内查询队列 2；同一 dataset 新请求 generation+1 并丢弃旧响应；看板顺序队列 ≤2；排队中显示"排队中"，禁止隐式定时刷新（`architecture.md:89-93`）。
 
 ## 2. 元数据（F）
 
@@ -42,7 +42,7 @@
 
 ## 4. 结果展示与导出
 
-- 结果只与 `(connectionId, queryHash, generation)` 绑定；错代响应不得写入状态（`architecture.md:76-83`）。
+- 结果只与 `(connectionId, queryHash, generation)` 绑定；错代响应不得写入状态（`architecture.md:77-85`）。
 - `truncated=true`：可标"样本/已截断"、可预览；**不可**计算"总计/占比"并宣称完整，不可导出全量。
 - 每张卡显示独立取数时间；部分失败标"部分成功"，不用单一"数据截至"时间（产品不变量 7）。
 - CSV 导出：带时间/查询版本/范围；对 `=`、`+`、`-`、`@` 开头单元格做公式注入转义；UTF-8/BOM 正确；只导出当前已验证结果。
@@ -61,13 +61,13 @@
 - mcp contribution 最多 1 个、需 backend + 用户 opt-in；MVP **不声明**。
 - 内置 Agent 只在 agent 模式合并插件工具，Ask 模式不调用，非只读工具逐次审批；外部 MCP 的 `external_tools` 三态未验证（H）。
 
-## 7. 错误模型（I，`architecture.md:95-112`）
+## 7. 错误模型（I，`architecture.md:95-115`）
 
 - 统一 `AppError { code, message, detail?, retryable }`；文案分"用户可修复 / 需管理员 / 需升级宿主"。
 - code：`HOST_API_UNSUPPORTED`、`PLUGIN_PERMISSION_DENIED`、`DATA_ACCESS_NOT_GRANTED`、`CONNECTION_NOT_OPEN`、`CONNECTION_UNSUPPORTED`、`SQL_REJECTED`、`QUERY_TIMEOUT`、`QUERY_TRUNCATED`、`RESULT_TOO_LARGE`、`SCHEMA_MISMATCH`、`FORMAT_VERSION_UNSUPPORTED`、`SAVE_CANCELLED`、`STORAGE_QUOTA`、`AI_UNAVAILABLE`/`AI_REFUSED`。
 - 错误里可带 code/耗时/行数/截断标记；**不得**带 SQL 字面量、结果值、连接串、token。
 
-## 8. 代码必须强制的 8 条不变量（`architecture.md:76-83`）
+## 8. 代码必须强制的 9 条不变量（`architecture.md:77-85`）
 
 1. 没有 `host.data:read` + grant，不发起查询；拒绝后不重试轰炸。
 2. 查询结果只与 `(connectionId, queryHash, generation)` 绑定；错代响应不得写入状态。
@@ -77,6 +77,7 @@
 6. 报表/看板只引用存在的 datasetVersion；删除被引用对象必须显式确认。
 7. AI 候选未通过 schema/字段校验不得进入预览；未人工确认不得保存。
 8. 看板刷新无跨查询事务；UI 必须逐卡显示时间，不能给单一"数据截至"时间。
+9. 看板 `layout` 只存 12 列网格坐标：加载校验边界、不重叠、与 `reportRefs` 一一对应；不存像素坐标与渲染结果。
 
 ## 9. 安全不变量（`release-and-security.md:80-84`）
 
