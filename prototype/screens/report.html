@@ -1,0 +1,673 @@
+<!doctype html>
+<html lang="zh-CN" data-dbx-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>dbx-plugin-report 原型 · 报表设计 / 预览</title>
+    <link rel="stylesheet" href="../tokens.css" />
+    <link rel="stylesheet" href="../app.css" />
+    <style>
+      /* 页级样式（.rp-*）：app.css 没有、只在报表原型页使用。全部取自 --color-* / --radius-* / 尺度变量。 */
+      .rp-side {
+        flex: 0 0 280px;
+      }
+
+      .rp-side-foot {
+        flex: 0 0 auto;
+        padding: 8px 12px;
+        border-top: 1px solid var(--color-border);
+        font-size: var(--fs-11);
+        color: var(--color-muted-foreground);
+        line-height: 1.5;
+      }
+
+      /* 侧栏里的数量输入（Top-N） */
+      .rp-num {
+        width: 64px;
+        flex: 0 0 auto;
+      }
+
+      /* 预览卡片占满右栏剩余高度，图表按卡片高度伸缩 */
+      .rp-preview {
+        flex: 1 1 auto;
+        min-height: 0;
+      }
+
+      /* 口径漂移场景的预览卡片：固定高度，避免内容把差异面板挤出视口 */
+      .rp-h240 {
+        flex: 0 0 240px;
+        min-height: 0;
+      }
+
+      /* 卡片内的口径说明行（不是产品文案的容器，只是排版） */
+      .rp-note {
+        flex: 0 0 auto;
+        padding: 6px 12px;
+        border-top: 1px solid var(--color-border-light);
+        font-size: var(--fs-11);
+        color: var(--color-muted-foreground);
+        line-height: 1.55;
+      }
+
+      /* 读者控制条：app.css 没有“工具栏 + chip”的组合，这里补一条 */
+      .rp-readerbar {
+        display: flex;
+        align-items: center;
+        gap: var(--gap-4);
+        flex: 0 0 auto;
+        padding: 6px 12px;
+        border-bottom: 1px solid var(--color-border);
+        background: var(--color-background-secondary);
+      }
+
+      /* .chip 原本是展示用 span；读者控制条把它做成可点的按钮 */
+      .rp-readerbar button.chip {
+        height: 22px;
+        background: var(--color-background);
+        cursor: pointer;
+      }
+
+      .rp-readerbar button.chip:hover {
+        border-color: var(--color-ring);
+      }
+
+      /* 口径不一致时，预览数据降透明度，但仍可读 */
+      .rp-dim {
+        opacity: 0.55;
+      }
+
+      /* 边界场景 2×2 面板 */
+      .rp-edge {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--gap-5);
+        align-content: start;
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: auto;
+        padding: var(--gap-5);
+      }
+
+      .rp-edge > .panel {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+
+      .rp-edge .panel-body {
+        display: flex;
+        flex-direction: column;
+        gap: var(--gap-4);
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: auto;
+      }
+    </style>
+  </head>
+  <body data-page="报表">
+    <!-- 原型工具条：场景切换 / 主题 / 返回索引，不属于产品界面 -->
+    <div class="proto-bar">
+      <span class="proto-brand">原型 v1</span>
+      <span class="proto-page">报表</span>
+      <div class="seg" data-proto-scenarios></div>
+      <span id="proto-scenario-caption" class="tiny"></span>
+      <span class="spacer"></span>
+      <button type="button" class="btn btn-ghost btn-sm" data-proto-theme>暗色</button>
+      <a class="btn btn-ghost btn-sm" href="../index.html">索引</a>
+    </div>
+
+    <!-- 场景 1：设计态 —— 左栏配置、右栏柱状预览 -->
+    <section class="scenario" data-scenario="design">
+      <div class="topbar">
+        <span class="title">各区成交额</span>
+        <span class="badge badge-outline">报表</span>
+        <span class="crumb ellipsis">数据集：周销售明细（按区域×渠道聚合）</span>
+        <span class="spacer"></span>
+        <span class="badge">未保存</span>
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm"
+          data-proto-toast="另存为：每次保存都会弹文件对话框，不写回原文件（原型示意）"
+        >
+          另存为
+        </button>
+      </div>
+      <div class="main">
+        <!-- 配置栏 -->
+        <aside class="sidebar rp-side">
+          <div class="pane-head">
+            <span class="strong">报表配置</span>
+            <span class="spacer"></span>
+            <span class="badge">草稿</span>
+          </div>
+          <div class="pane-body stack-5">
+            <div class="field">
+              <label for="rp-title">报表标题</label>
+              <input id="rp-title" class="input" value="各区成交额" />
+            </div>
+
+            <div class="field">
+              <span class="label">视图类型</span>
+              <div class="seg" role="group" aria-label="视图类型">
+                <button type="button" aria-pressed="false">表格</button>
+                <button type="button" aria-pressed="true">柱状</button>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="rp-x">维度（x）</label>
+              <select id="rp-x" class="select">
+                <option selected>区域 × 渠道（region_channel）</option>
+                <option>区域（region）</option>
+                <option>渠道（channel）</option>
+              </select>
+              <span class="hint">只列出数据集已确认的字段；一个维度一根柱。</span>
+            </div>
+
+            <div class="field">
+              <span class="label">指标（y）</span>
+              <label class="check"><input type="checkbox" checked />成交额（gmv）</label>
+              <label class="check"><input type="checkbox" />订单数（orders）</label>
+              <span class="hint">多指标会按已确认的字段顺序叠加；首版演示单指标。</span>
+            </div>
+
+            <div class="field">
+              <label for="rp-top">Top-N</label>
+              <div class="row">
+                <select id="rp-top" class="select">
+                  <option selected>前 N 类</option>
+                  <option>不截取</option>
+                </select>
+                <input class="input rp-num" type="number" min="1" max="50" value="6" aria-label="Top-N 数量" />
+              </div>
+              <span class="hint">只截取“已取回行”的展示，不改写 SQL；样本被截断时不可用。</span>
+            </div>
+
+            <div class="field">
+              <label for="rp-total">合计</label>
+              <select id="rp-total" class="select">
+                <option selected>SQL 标记列（is_total = 1）</option>
+                <option>无</option>
+              </select>
+              <span class="hint">只显示 SQL 输出的标记行；前端不求和，找不到标记行就显示「未找到合计行」。</span>
+            </div>
+
+            <div class="field">
+              <span class="label">读者可用操作</span>
+              <label class="check"><input type="checkbox" checked />允许读者筛选（只作用于已取回行）</label>
+              <label class="check"><input type="checkbox" checked />允许读者排序（只作用于已取回行）</label>
+            </div>
+          </div>
+          <div class="rp-side-foot">报表不保存数据，只保存“怎么查、怎么显示、口径说明”。</div>
+        </aside>
+
+        <!-- 预览区 -->
+        <div class="content">
+          <div class="pane-head">
+            <span class="strong">预览</span>
+            <span class="badge badge-outline">柱状</span>
+            <span class="spacer"></span>
+            <span class="tiny muted">静态预览 · 不重新取数</span>
+          </div>
+          <div class="pane-body stack-5">
+            <section class="card rp-preview">
+              <div class="card-head">
+                <span class="dot dot-ok"></span>
+                <span class="ellipsis">各区成交额</span>
+                <span class="spacer"></span>
+                <span class="badge badge-outline">Top 6</span>
+                <span class="badge">样本 8 行</span>
+              </div>
+              <div class="card-body">
+                <div class="chart">
+                  <div class="bars">
+                    <div class="bar-col"><span class="bar-val">128.9万</span><div class="bar" style="--h: 88%"></div></div>
+                    <div class="bar-col"><span class="bar-val">98.6万</span><div class="bar" style="--h: 67%"></div></div>
+                    <div class="bar-col"><span class="bar-val">74.2万</span><div class="bar" style="--h: 51%"></div></div>
+                    <div class="bar-col"><span class="bar-val">70.1万</span><div class="bar" style="--h: 48%"></div></div>
+                    <div class="bar-col"><span class="bar-val">31.1万</span><div class="bar" style="--h: 21%"></div></div>
+                    <div class="bar-col"><span class="bar-val">28.8万</span><div class="bar" style="--h: 20%"></div></div>
+                  </div>
+                  <div class="axis-x">
+                    <span>华东·天猫</span>
+                    <span>华东·京东</span>
+                    <span>华南·抖音</span>
+                    <span>华北·天猫</span>
+                    <span>华中·抖音</span>
+                    <span>西南·京东</span>
+                  </div>
+                </div>
+              </div>
+              <div class="card-foot">
+                <span>样本 8/8</span>
+                <span>·</span>
+                <span>取数 10:23:58</span>
+                <span class="spacer"></span>
+                <span>单位：元（柱顶为万元）</span>
+              </div>
+            </section>
+            <div class="row">
+              <span class="tiny muted">预览使用最近一次运行结果（样本 8 行）</span>
+              <span class="spacer"></span>
+              <button
+                type="button"
+                class="btn btn-primary"
+                data-proto-toast="完成设计：报表配置写回本机文档（原型示意）"
+                data-proto-toast-kind="ok"
+              >
+                完成设计
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 场景 2：表格视图（读者看到的表格 + 读者控制条） -->
+    <section class="scenario" data-scenario="table" hidden>
+      <div class="topbar">
+        <span class="title">各区成交额</span>
+        <span class="badge badge-outline">报表</span>
+        <span class="crumb ellipsis">预览 · 表格</span>
+        <span class="spacer"></span>
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm"
+          data-proto-toast="将重新执行 SQL 并替换当前样本（原型示意）"
+        >
+          重新取数
+        </button>
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm"
+          data-proto-toast="另存为：每次保存都会弹文件对话框，不写回原文件（原型示意）"
+        >
+          另存为
+        </button>
+      </div>
+      <div class="content">
+        <!-- 读者控制条：作者预设后，读者只能动这两类操作 -->
+        <div class="rp-readerbar">
+          <button type="button" class="chip" data-proto-toast="区域筛选：只过滤已取回行（原型示意）">
+            区域：全部 <span class="tiny">▾</span>
+          </button>
+          <button type="button" class="btn btn-sm" data-proto-toast="按成交额降序（原型示意）">
+            成交额 <span class="caret">↓</span>
+          </button>
+          <span class="spacer"></span>
+          <span class="tiny muted">筛选与排序只作用于已取回的 8 行</span>
+        </div>
+        <div class="pane-body stack-5">
+          <section class="card rp-preview">
+            <div class="card-head">
+              <span class="dot dot-ok"></span>
+              <span class="ellipsis">各区成交额</span>
+              <span class="badge badge-outline">表格</span>
+              <span class="spacer"></span>
+              <span class="badge badge-outline">5 列</span>
+            </div>
+            <!-- Proto.table 渲染：5 列 8 行 + 一行 SQL 合计标记行 -->
+            <div class="table-wrap" data-table="reportSample"></div>
+            <div class="rp-note">合计来自 SQL 标记行（is_total = 1），不是前端求和。</div>
+            <div class="card-foot">
+              <span>样本 8/8</span>
+              <span>·</span>
+              <span>取数 10:23:58</span>
+              <span class="spacer"></span>
+              <span>上限 500 行</span>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <!-- 场景 3：柱状视图（Top-N 只截取展示） -->
+    <section class="scenario" data-scenario="bar" hidden>
+      <div class="topbar">
+        <span class="title">各区成交额</span>
+        <span class="badge badge-outline">报表</span>
+        <span class="crumb ellipsis">预览 · 柱状</span>
+        <span class="spacer"></span>
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm"
+          data-proto-toast="将重新执行 SQL 并替换当前样本（原型示意）"
+        >
+          重新取数
+        </button>
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm"
+          data-proto-toast="另存为：每次保存都会弹文件对话框，不写回原文件（原型示意）"
+        >
+          另存为
+        </button>
+      </div>
+      <div class="content">
+        <div class="rp-readerbar">
+          <button type="button" class="chip" data-proto-toast="区域筛选：只过滤已取回行（原型示意）">
+            区域：全部 <span class="tiny">▾</span>
+          </button>
+          <button type="button" class="btn btn-sm" data-proto-toast="按成交额降序（原型示意）">
+            成交额 <span class="caret">↓</span>
+          </button>
+          <span class="spacer"></span>
+          <span class="tiny muted">筛选与排序只作用于已取回的 8 行</span>
+        </div>
+        <div class="pane-body stack-5">
+          <section class="card rp-preview">
+            <div class="card-head">
+              <span class="dot dot-ok"></span>
+              <span class="ellipsis">各区成交额</span>
+              <span class="badge">Top 6</span>
+              <span class="spacer"></span>
+              <span class="tiny muted">按 gmv 降序</span>
+            </div>
+            <div class="card-body">
+              <div class="chart">
+                <div class="bars">
+                  <div class="bar-col"><span class="bar-val">128.9万</span><div class="bar" style="--h: 88%"></div></div>
+                  <div class="bar-col"><span class="bar-val">98.6万</span><div class="bar" style="--h: 67%"></div></div>
+                  <div class="bar-col"><span class="bar-val">74.2万</span><div class="bar" style="--h: 51%"></div></div>
+                  <div class="bar-col"><span class="bar-val">70.1万</span><div class="bar" style="--h: 48%"></div></div>
+                  <div class="bar-col"><span class="bar-val">31.1万</span><div class="bar" style="--h: 21%"></div></div>
+                  <div class="bar-col"><span class="bar-val">28.8万</span><div class="bar" style="--h: 20%"></div></div>
+                </div>
+                <div class="axis-x">
+                  <span>华东·天猫</span>
+                  <span>华东·京东</span>
+                  <span>华南·抖音</span>
+                  <span>华北·天猫</span>
+                  <span>华中·抖音</span>
+                  <span>西南·京东</span>
+                </div>
+              </div>
+            </div>
+            <div class="rp-note">
+              显示已取回样本中 gmv 最大的 6 类；样本 8/8，未截断。<br />
+              未展示的 2 类不合并为「其他」桶——要合计请在 SQL 里聚合。
+            </div>
+            <div class="card-foot">
+              <span>样本 8/8</span>
+              <span>·</span>
+              <span>取数 10:23:58</span>
+              <span class="spacer"></span>
+              <span>单位：元（柱顶为万元）</span>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <!-- 场景 4：口径漂移（数据集已更新，报表仍是旧口径） -->
+    <section class="scenario" data-scenario="stale" hidden>
+      <div class="topbar">
+        <span class="title">各区成交额</span>
+        <span class="badge badge-outline">报表</span>
+        <span class="badge badge-warn">口径已变</span>
+        <span class="crumb ellipsis">数据集：周销售明细（今日 09:40 有更新）</span>
+        <span class="spacer"></span>
+        <span class="badge">只读预览</span>
+      </div>
+      <div class="content">
+        <div class="pane-head">
+          <span class="strong">口径漂移</span>
+          <span class="badge badge-warn">需要重新确认</span>
+          <span class="spacer"></span>
+          <span class="tiny muted">比对依据：内容哈希，不引用版本历史</span>
+        </div>
+        <div class="pane-body stack-5">
+          <div class="alert alert-warn">
+            <span class="alert-icon">!</span>
+            <div class="alert-body">
+              <span class="alert-title">数据集已在今日 09:40 更新，本报表仍绑定 10-21 18:12 的口径</span>
+              <span class="small">报表没有自动改用新口径。确认前只允许查看旧配置，不能作为已确认报表使用。</span>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <span>口径差异</span>
+              <span class="spacer"></span>
+              <span class="badge badge-outline">basis</span>
+            </div>
+            <div class="panel-body">
+              <dl class="kv">
+                <dt>queryHash</dt>
+                <dd>
+                  <span class="code-pill">q_8f21ac</span> →
+                  <span class="code-pill">q_c41e77</span>
+                  <span class="tiny muted">查询构成已变</span>
+                </dd>
+                <dt>fieldsHash</dt>
+                <dd>
+                  <span class="code-pill">f_2d90b1</span>
+                  <span class="tiny muted">未变（字段契约一致）</span>
+                </dd>
+                <dt>confirmedAt</dt>
+                <dd>2026-10-21 18:12 <span class="tiny muted">保存时的确认时间，不参与比对</span></dd>
+              </dl>
+              <div class="divider"></div>
+              <div class="row wrap">
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  data-proto-toast="用当前数据集重新取数并更新报表口径（原型示意）"
+                  data-proto-toast-kind="ok"
+                >
+                  用新版本重新确认
+                </button>
+                <button
+                  type="button"
+                  class="btn"
+                  data-proto-toast="保持旧口径：只读查看，不作为已确认报表（原型示意）"
+                >
+                  保持旧口径（只读）
+                </button>
+                <span class="tiny muted">重新确认会按当前数据集取数，并把新哈希写入报表口径。</span>
+              </div>
+            </div>
+          </div>
+
+          <section class="card rp-h240">
+            <div class="card-head">
+              <span class="dot dot-warn"></span>
+              <span class="ellipsis">各区成交额</span>
+              <span class="badge badge-warn">口径已变</span>
+              <span class="spacer"></span>
+              <span class="tiny muted">取数 10:23:58</span>
+            </div>
+            <div class="card-body rp-dim">
+              <div class="chart">
+                <div class="bars">
+                  <div class="bar-col"><span class="bar-val">128.9万</span><div class="bar" style="--h: 88%"></div></div>
+                  <div class="bar-col"><span class="bar-val">98.6万</span><div class="bar" style="--h: 67%"></div></div>
+                  <div class="bar-col"><span class="bar-val">74.2万</span><div class="bar" style="--h: 51%"></div></div>
+                  <div class="bar-col"><span class="bar-val">70.1万</span><div class="bar" style="--h: 48%"></div></div>
+                  <div class="bar-col"><span class="bar-val">31.1万</span><div class="bar" style="--h: 21%"></div></div>
+                  <div class="bar-col"><span class="bar-val">28.8万</span><div class="bar" style="--h: 20%"></div></div>
+                </div>
+                <div class="axis-x">
+                  <span>华东·天猫</span>
+                  <span>华东·京东</span>
+                  <span>华南·抖音</span>
+                  <span>华北·天猫</span>
+                  <span>华中·抖音</span>
+                  <span>西南·京东</span>
+                </div>
+              </div>
+            </div>
+            <div class="card-foot">
+              <span>旧口径数据 · 仅供查看</span>
+              <span class="spacer"></span>
+              <span>数据集更新后没有自动刷新</span>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <!-- 场景 5：边界（空结果 / 全 NULL / 高基数 / 大数） -->
+    <section class="scenario" data-scenario="edge" hidden>
+      <div class="topbar">
+        <span class="title">各区成交额</span>
+        <span class="badge badge-outline">报表</span>
+        <span class="crumb ellipsis">边界样本检查</span>
+        <span class="spacer"></span>
+        <span class="badge badge-outline">4 种边界</span>
+      </div>
+      <div class="content">
+        <div class="pane-head">
+          <span class="strong">边界样本</span>
+          <span class="spacer"></span>
+          <span class="tiny muted">四种都不是弹窗能解决的取数结果，这里给的是处置路径</span>
+        </div>
+        <div class="rp-edge">
+          <!-- ① 空结果 -->
+          <section class="panel">
+            <div class="panel-head">
+              <span>① 空结果</span>
+              <span class="spacer"></span>
+              <span class="badge">查询成功 · 0 行</span>
+            </div>
+            <div class="panel-body">
+              <div class="empty">
+                <div class="empty-art">∅</div>
+                <div class="empty-title">SQL 返回 0 行，报表没有可展示数据</div>
+                <div class="empty-desc">
+                  先检查 WHERE 条件是否过窄、时间范围是否覆盖本周，以及数据集绑定的连接是不是目标库。
+                </div>
+                <div class="row">
+                  <button type="button" class="btn btn-sm" data-proto-toast="打开数据集编辑器（原型示意）">
+                    检查数据集
+                  </button>
+                  <button type="button" class="btn btn-ghost btn-sm" data-proto-toast="重新取数（原型示意）">重新取数</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ② 指标列全 NULL -->
+          <section class="panel">
+            <div class="panel-head">
+              <span>② 指标列全 NULL</span>
+              <span class="spacer"></span>
+              <span class="badge">gmv · 8/8 NULL</span>
+            </div>
+            <div class="panel-body">
+              <div class="empty">
+                <div class="empty-art">∅</div>
+                <div class="empty-title">该列全为 NULL，无法作图</div>
+                <div class="empty-desc">
+                  gmv 在样本里没有任何非空值。改聚合方式（如 COALESCE 补默认值）或先在 SQL 里过滤掉空分组，再回来确认字段契约。
+                </div>
+                <div class="row">
+                  <button type="button" class="btn btn-sm" data-proto-toast="打开指标设置（原型示意）">改指标设置</button>
+                  <button type="button" class="btn btn-ghost btn-sm" data-proto-toast="查看数据集字段契约（原型示意）">
+                    看字段契约
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ③ 高基数类别 -->
+          <section class="panel">
+            <div class="panel-head">
+              <span>③ 高基数类别</span>
+              <span class="spacer"></span>
+              <span class="badge">37 类</span>
+            </div>
+            <div class="panel-body">
+              <div class="alert alert-warn">
+                <span class="alert-icon">!</span>
+                <div class="alert-body">
+                  <span class="alert-title">类别过多，柱状图不可读</span>
+                  <span class="small">样本里有 37 个不同类别，一屏柱状图最多能读十余根。</span>
+                </div>
+              </div>
+              <p class="small">建议在 SQL 里按业务口径聚合（GROUP BY）或加 CASE 合并小类，再取数。Top-N 只是展示截断，不是聚合。</p>
+              <p class="tiny muted">不会在前端砍成前 N 类再假称它是类别总数——截断要写进 SQL，口径才可核。</p>
+              <div class="row wrap">
+                <button type="button" class="btn btn-sm" data-proto-toast="打开数据集编辑器改 SQL（原型示意）">
+                  改 SQL 聚合
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  data-proto-toast="只在样本内展示前 N 类，会标注共 37 类（原型示意）"
+                >
+                  仍看样本内前 N 类
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <!-- ④ 大数精度 -->
+          <section class="panel">
+            <div class="panel-head">
+              <span>④ 大数</span>
+              <span class="spacer"></span>
+              <span class="badge badge-outline">decimal_string</span>
+            </div>
+            <div class="panel-body">
+              <div class="kpi">
+                <div class="value mono">12,893,456,789.01</div>
+                <div class="caption">成交额（元）· 原样显示</div>
+              </div>
+              <p class="tiny muted">字符串承载，不转 number，避免超过 2^53 丢精度。</p>
+              <p class="tiny muted">
+                2^53 = 9,007,199,254,740,992；超过它的整数用 JS number 表示会悄悄变值，所以这列按十进制字符串显示。
+              </p>
+              <div class="row">
+                <button type="button" class="btn btn-ghost btn-sm" data-proto-toast="字段信息（原型示意）">查看字段信息</button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <script src="../proto.js"></script>
+    <script src="../mock.js"></script>
+    <script>
+      // gmv / aov 在 mock 里按十进制字符串承载（避免转 number 丢精度），这里只加千分位排版，仍然不转 number。
+      function groupThousands(value) {
+        var parts = String(value).split(".");
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        return parts.join(".");
+      }
+
+      // 表格场景：5 列 8 行，最后一行是 SQL 返回的合计标记行（is_total = 1）。
+      // 合计值在真实实现里由 SQL 计算，这里只是照着 SQL 输出抄下来的静态数字。
+      window.PROTO_TABLES = window.PROTO_TABLES || {};
+      window.PROTO_TABLES.reportSample = {
+        columns: [
+          { key: "region", label: "区域" },
+          { key: "channel", label: "渠道" },
+          { key: "orders", label: "订单数", num: true },
+          { key: "gmv", label: "成交额（元）", num: true, mono: true },
+          { key: "aov", label: "客单价（元）", num: true, mono: true }
+        ],
+        rows: window.MOCK.rows.map(function (row) {
+          return {
+            region: row.region,
+            channel: row.channel,
+            orders: row.orders,
+            gmv: groupThousands(row.gmv),
+            aov: groupThousands(row.aov)
+          };
+        }),
+        total: { region: "合计", channel: "—", orders: "5,570", gmv: "4,507,408.93", aov: "809.05" }
+      };
+
+      window.PROTO_SCENARIOS = [
+        { id: "design", label: "设计态" },
+        { id: "table", label: "表格" },
+        { id: "bar", label: "柱状" },
+        { id: "stale", label: "口径漂移" },
+        { id: "edge", label: "边界" }
+      ];
+    </script>
+  </body>
+</html>

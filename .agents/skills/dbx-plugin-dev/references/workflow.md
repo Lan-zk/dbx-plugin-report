@@ -5,7 +5,7 @@
 - DBX 桌面端 ≥0.6.51（基线 `b160d130`），SQLite 优先、PostgreSQL 用于后续认证。
 - **Node.js 22+**：`dbx-plugin dev` 对 <22 硬报错 `dev requires Node.js 22+`（`plugins/sdk/cli/src/dev.rs:183,190-191`）；npm 包装器只要求 `>=18.18`，不要据此以为 dev 可用。
 - npm/pnpm，以及全局 `@dbx-app/plugin-cli`（仓库实现版本 0.1.9；文档 release workflow 固定 0.1.2，别混淆）。
-- 本仓库布局：宿主在 sibling `E:\File\self\github\dbx`（只读参考），插件在本仓库；产物 `.dbxp` 不入库或按仓库规则放 `fixtures/`。
+- 本仓库布局：宿主在与本仓库同级的 sibling `../dbx`（只读参考），插件在本仓库；产物 `.dbxp` 不入库或按仓库规则放 `fixtures/`。
 
 ## 2. CLI 真相
 

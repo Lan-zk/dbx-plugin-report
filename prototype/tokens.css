@@ -1,0 +1,126 @@
+/*
+ * 宿主 token 的本地镜像（原型期替身）。
+ *
+ * 为什么不自己发明一套：DBX 插件 iframe 里的 --color-* / --radius-* / --font-*
+ * 不是插件定义的，是宿主注入的。宿主在挂载插件前把桌面端 :root 上匹配
+ * /^--(color|radius|font)/ 且非 --dbx-* 的计算值逐个 setProperty 到插件根节点
+ * （F: DBX apps/desktop/src/lib/plugins/pluginHostBridge.ts:1313-1319，
+ *  取值列表见 apps/desktop/src/components/plugins/PluginWorkbenchHost.vue:495-510）。
+ *
+ * 因此本文件的值必须与宿主解析后的字面量一致：原型里看到什么颜色，装进 DBX 后
+ * 就是什么颜色。真机运行时本文件应当被删除——同名变量由宿主注入覆盖，不需要插件自带。
+ * 默认半径取自 apps/desktop/src/styles/tokens.css:137-140（4/4/6/6），
+ * 而不是 globals.css:165-168 的 6/6/10/14（后者被 tokens.css 覆盖）。
+ */
+
+:root,
+:root[data-dbx-theme="light"] {
+  color-scheme: light;
+
+  --color-background: rgb(255 255 255);
+  --color-background-solid: rgb(255 255 255);
+  --color-background-secondary: rgb(245 245 245);
+  --color-foreground: rgb(10 10 10);
+  --color-text: rgb(10 10 10);
+  --color-text-secondary: rgb(115 115 115);
+  --color-text-tertiary: rgb(179 179 179);
+  --color-card: rgb(255 255 255);
+  --color-card-foreground: rgb(10 10 10);
+  --color-popover: rgb(255 255 255);
+  --color-popover-foreground: rgb(10 10 10);
+  --color-primary: rgb(23 23 23);
+  --color-primary-foreground: rgb(250 250 250);
+  --color-primary-alpha: rgb(23 23 23 / 0.12);
+  --color-secondary: rgb(245 245 245);
+  --color-secondary-foreground: rgb(23 23 23);
+  --color-muted: rgb(245 245 245);
+  --color-muted-foreground: rgb(115 115 115);
+  --color-accent: rgb(245 245 245);
+  --color-accent-foreground: rgb(23 23 23);
+  --color-hover: rgb(245 245 245);
+  --color-destructive: rgb(231 0 11);
+  --color-error: rgb(231 0 11);
+  --color-error-bg: rgb(231 0 11 / 0.1);
+  --color-border: rgb(229 229 229);
+  --color-border-light: rgb(229 229 229 / 0.6);
+  --color-input: rgb(229 229 229);
+  --color-ring: rgb(161 161 161);
+  --color-success: rgb(22 163 74);
+  --color-success-bg: rgb(22 163 74 / 0.12);
+  --color-warning: rgb(217 119 6);
+  --color-warning-bg: rgb(217 119 6 / 0.14);
+  --color-info: rgb(37 99 235);
+  --color-info-bg: rgb(37 99 235 / 0.12);
+
+  /* 宿主给的是灰阶序列，不是分类色板（见 prototype/README.md「已知限制」）。 */
+  --color-chart-1: rgb(212 212 212);
+  --color-chart-2: rgb(115 115 115);
+  --color-chart-3: rgb(82 82 82);
+  --color-chart-4: rgb(64 64 64);
+  --color-chart-5: rgb(38 38 38);
+
+  --radius-sm: 4px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 6px;
+
+  --font-sans: "Geist Variable", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+    "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Fira Code", "Cascadia Code", "Cascadia Mono", "JetBrains Mono", ui-monospace,
+    SFMono-Regular, "SF Mono", Menlo, Consolas, monospace, "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei";
+}
+
+:root[data-dbx-theme="dark"] {
+  color-scheme: dark;
+
+  --color-background: rgb(19 20 22);
+  --color-background-solid: rgb(19 20 22);
+  --color-background-secondary: rgb(42 42 45);
+  --color-foreground: rgb(215 215 219);
+  --color-text: rgb(215 215 219);
+  --color-text-secondary: rgb(151 152 157);
+  --color-text-tertiary: rgb(106 107 112);
+  --color-card: rgb(27 27 30);
+  --color-card-foreground: rgb(215 215 219);
+  --color-popover: rgb(30 30 32);
+  --color-popover-foreground: rgb(221 221 226);
+  --color-primary: rgb(208 208 214);
+  --color-primary-foreground: rgb(19 20 22);
+  --color-primary-alpha: rgb(208 208 214 / 0.14);
+  --color-secondary: rgb(42 42 45);
+  --color-secondary-foreground: rgb(215 215 219);
+  --color-muted: rgb(42 42 45);
+  --color-muted-foreground: rgb(151 152 157);
+  --color-accent: rgb(46 47 51);
+  --color-accent-foreground: rgb(221 221 226);
+  --color-hover: rgb(46 47 51);
+  --color-destructive: rgb(243 98 95);
+  --color-error: rgb(243 98 95);
+  --color-error-bg: rgb(243 98 95 / 0.12);
+  --color-border: rgb(110 110 114 / 0.28);
+  --color-border-light: rgb(110 110 114 / 0.2);
+  --color-input: rgb(110 110 114 / 0.34);
+  --color-ring: rgb(133 134 139);
+  --color-success: rgb(74 222 128);
+  --color-success-bg: rgb(74 222 128 / 0.16);
+  --color-warning: rgb(251 191 36);
+  --color-warning-bg: rgb(251 191 36 / 0.16);
+  --color-info: rgb(96 165 250);
+  --color-info-bg: rgb(96 165 250 / 0.16);
+
+  --color-chart-1: rgb(212 212 212);
+  --color-chart-2: rgb(115 115 115);
+  --color-chart-3: rgb(82 82 82);
+  --color-chart-4: rgb(64 64 64);
+  --color-chart-5: rgb(38 38 38);
+}
+
+/*
+ * 原型自用变量（--proto-*）：只服务"这是原型"的提示与工具条，
+ * 不进产品代码。真机实现时整段删除。
+ */
+:root {
+  --proto-bar-h: 34px;
+  --proto-mark: rgb(217 119 6);
+}

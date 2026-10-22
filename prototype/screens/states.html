@@ -1,0 +1,923 @@
+<!doctype html>
+<html lang="zh-CN" data-dbx-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>状态与错误 · 原型</title>
+    <link rel="stylesheet" href="../tokens.css" />
+    <link rel="stylesheet" href="../app.css" />
+    <style>
+      /* 本页专用（.st-*）：错误码表的列宽、模拟屏高度、缩略对话框排布。
+         只服务这一屏；其余一律复用 app.css 的组件类。 */
+      .st-fill {
+        display: flex;
+        flex-direction: column;
+        gap: var(--gap-3);
+        height: 100%;
+        min-height: 0;
+      }
+
+      .st-legend {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--gap-2) var(--gap-5);
+        font-size: var(--fs-11);
+        color: var(--color-muted-foreground);
+      }
+
+      .st-legend .row {
+        gap: var(--gap-2);
+      }
+
+      /* 24 行 × 5 列固定布局：含义列允许换行，其余列不换行，避免横向滚动 */
+      .st-codes {
+        table-layout: fixed;
+      }
+
+      .st-codes th:nth-child(1),
+      .st-codes td:nth-child(1) {
+        width: 238px;
+      }
+
+      .st-codes th:nth-child(3),
+      .st-codes td:nth-child(3) {
+        width: 178px;
+      }
+
+      .st-codes th:nth-child(4),
+      .st-codes td:nth-child(4) {
+        width: 96px;
+      }
+
+      .st-codes th:nth-child(5),
+      .st-codes td:nth-child(5) {
+        width: 64px;
+      }
+
+      .st-codes td {
+        vertical-align: middle;
+      }
+
+      .st-codes td:nth-child(2) {
+        white-space: normal;
+      }
+
+      /* 页面顶部轻提示条（app.css 没有「横幅条」组件，这里按条带样式补） */
+      .st-notice {
+        display: flex;
+        align-items: center;
+        gap: var(--gap-4);
+        padding: 6px var(--gap-5);
+        background: var(--color-warning-bg);
+        border-bottom: 1px solid var(--color-warning);
+        font-size: var(--fs-12);
+      }
+
+      .st-screen {
+        height: 340px;
+      }
+
+      .st-two {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--gap-5);
+      }
+
+      .st-empty-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--gap-5);
+      }
+
+      .st-cell {
+        height: 300px;
+      }
+
+      .st-dialog-strip {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: var(--gap-5);
+        align-items: start;
+      }
+
+      .st-dialog-strip > .stack {
+        min-width: 0;
+      }
+
+      .st-dialog-strip .dialog {
+        width: auto;
+        max-width: 100%;
+      }
+
+      /* 缩略对话框里的对比表要挤进 400px 左右宽度 */
+      .st-mini {
+        font-size: var(--fs-11);
+      }
+
+      .st-mini th,
+      .st-mini td {
+        height: 26px;
+        padding: 0 6px;
+      }
+
+      .st-bind-pick {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        max-width: 360px;
+        text-align: left;
+      }
+
+      /* 别名一行 + 连接信息一行；两行都占满卡片，避免别名被省略号截断 */
+      .st-bind-row {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding: 6px 0;
+        border-bottom: 1px solid var(--color-border);
+      }
+
+      .st-bind-row:last-child {
+        border-bottom: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="proto-bar">
+      <span class="proto-brand">原型 v1</span>
+      <span class="proto-page">状态与错误</span>
+      <div class="seg" data-proto-scenarios></div>
+      <span id="proto-scenario-caption" class="tiny"></span>
+      <span class="spacer"></span>
+      <button type="button" class="btn btn-ghost btn-sm" data-proto-theme>暗色</button>
+      <a class="btn btn-ghost btn-sm" href="../index.html">索引</a>
+    </div>
+
+    <!-- ============ 场景 1：错误码总表 ============ -->
+    <section class="scenario" data-scenario="codes">
+      <div class="topbar">
+        <span class="title">24 个错误码：含义、呈现形式、恢复方式、里程碑</span>
+        <span class="badge">24 条</span>
+        <span class="spacer"></span>
+        <span class="ann">数据源 MOCK.errors</span>
+      </div>
+      <div class="main">
+        <div class="content">
+          <div class="pane-body">
+            <div class="st-fill">
+              <div class="st-legend">
+                <span class="strong">呈现形式</span>
+                <span class="row">
+                  <span class="chip">全屏阻断</span>
+                  <span>占满内容区，只能离开或升级</span>
+                </span>
+                <span class="row">
+                  <span class="chip">内联</span>
+                  <span>嵌在结果区/页顶的条或块，就地处理</span>
+                </span>
+                <span class="row">
+                  <span class="chip">行内</span>
+                  <span>卡片/绑定行内一小段，不打断当前操作</span>
+                </span>
+                <span class="row">
+                  <span class="chip">徽标</span>
+                  <span>角标或状态点，点开看差异</span>
+                </span>
+                <span class="row">
+                  <span class="chip">对话框</span>
+                  <span>必须做选择才能继续</span>
+                </span>
+                <span class="row">
+                  <span class="chip">toast</span>
+                  <span>短暂提示，不阻塞，3.2 s 后消失</span>
+                </span>
+                <span class="row">
+                  <span class="chip">卡片状态</span>
+                  <span>只在看板单卡内显示，其它卡不受影响</span>
+                </span>
+              </div>
+
+              <div class="table-wrap">
+                <table class="table st-codes">
+                  <thead>
+                    <tr>
+                      <th>错误码</th>
+                      <th>含义</th>
+                      <th>呈现形式</th>
+                      <th>恢复方式</th>
+                      <th>里程碑</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><span class="code-pill">HOST_API_UNSUPPORTED</span></td>
+                      <td>宿主缺少 <span class="mono">host.data.query</span>；插件内无法取数</td>
+                      <td><span class="badge badge-outline">全屏阻断</span> <span class="tiny muted">插件全局</span></td>
+                      <td><span class="code-pill">no</span></td>
+                      <td><span class="badge">M0</span></td>
+                    </tr>
+                    <tr>
+                      <td><span class="code-pill">PLUGIN_PERMISSION_DENIED</span></td>
+                      <td>manifest 未声明 <span class="mono">host.data:read</span>；调用被宿主拒绝</td>
+                      <td><span class="badge badge-outline">内联</span> <span class="tiny muted">编辑器</span></td>
+                      <td><span class="code-pill">no</span></td>
+                      <td><span class="badge">M0</span></td>
+                    </tr>
+                    <tr>
+                      <td><span class="code-pill">DATA_ACCESS_NOT_GRANTED</span></td>
+                      <td>本次授权弹框被拒绝；不自动再弹，SQL 保留</td>
+                      <td><span class="badge badge-outline">内联</span> <span class="tiny muted">结果区 + 重新授权</span></td>
+                      <td><span class="code-pill">same</span></td>
+                      <td><span class="badge">M0</span></td>
+                    </tr>
+                    <tr>
+                      <td><span class="code-pill">CONNECTION_NOT_OPEN</span></td>
+                      <td>连接未在 DBX 打开；查询没有发出</td>
+                      <td><span class="badge badge-outline">行内</span> <span class="tiny muted">绑定行</span></td>
+                      <td><span class="code-pill">same</span></td>
+                      <td><span class="badge">M1</span></td>
+                    </tr>
+                    <tr>
+                      <td><span class="code-pill">CONNECTION_UNSUPPORTED</span></td>
+                      <td>非 SQL 连接或方言未适配；不提供执行</td>
+                      <td><span class="badge badge-outline">行内</span> <span class="tiny muted">绑定行</span></td>
+                      <td><span class="code-pill">no</span></td>
+                      <td><span class="badge">M1</span></td>
+                    </tr>
+                    <tr>
+                      <td><span class="code-pill">SQL_REJECTED</span></td>
+                      <td>只读分类/多语句/不支持语法；不自动改写 SQL</td>
+                      <td><span class="badge badge-outline">内联</span> <span class="tiny muted">SQL 编辑器</span></td>
+                      <td><span class="code-pill">edit</span></td>
+                      <td><span class="badge">M1</span></td>
+                    </tr>
+                    <tr>
+                      <td><span class="code-pill">QUERY_TIMEOUT</span></td>
+                      <td>已等待 60 s，宿主停止等待；服务端可能仍在执行</td>
+                      <td><span class="badge badge-outline">内联</span> <span class="tiny muted">结果区</span></td>
+                      <td><span class="code-pill">same</span></td>
+                      <td><span class="badge">M1</span></td>
+                    </tr>
+                    <tr>
+                      <td><span class="code-pill">QUERY_TRUNCATED</span></td>
+                      <td>已取回 500 行（上限 500）；只是样本，不是完整结果</td>
+                      <td><span class="badge badge-outline">内联</span> <span class="tiny muted">结果区顶部</span></td>
+                      <td><span class="code-pill">no</span></td>
+                      <td><span class="badge">M1</span></td>
+                    </tr>
+                    <tr>
+                      <td><span class="code-pill">RESULT_TOO_LARGE</span></td>
+                      <td>序列化累计超过 8 MiB；减列或先在 SQL 聚合</td>
+                      <td><span class="badge badge-outline">内联</span> <span class="tiny muted">结果区</span></td>
+                      <td><span class="code-pill">edit</span></td>
+                      <td><span class="badge">M1</span></td>
+                    </tr>
+                    <tr>
+                      <td><span class="code-pill">SCHEMA_MISMATCH</span></td>
+                      <td>加载时字段引用不一致；拒绝打开/保存并指出字段引用位置</td>
+                      <td><span class="badge badge-outline">内联</span> <span class="tiny muted">打开/保存</span></td>
+                      <td><span class="code-pill">no</span></td>
+                      <td><span class="badge">M1</span></td>
+                    </tr>
+                    <tr>
+                      <td><span class="code-pill">SCHEMA_DRIFT</span></td>
+                      <td>运行结果列/类型与已确认字段契约不一致</td>
+                      <td><span class="badge badge-outline">徽标</span> <span class="tiny muted">报表角标 → 对话框</span></td>
+                      <td><span class="code-pill">confirm</span></td>
+                      <td><span class="badge">M2</span></td>
+                    </tr>
+                    <tr>
+                      <td><span class="code-pill">FILE_CANCELED</span></td>
+                      <td>在系统文件框里取消；未写入任何文件</td>
+                      <td><span class="badge badge-outline">toast</span> <span class="tiny muted">取消保存</span></td>
+                      <td><span class="code-pill">same</span></td>
+                      <td><span class="badge">M0</span></td>
+                    </tr>
+                    <tr>
+                      <td><span class="code-pill">FILE_WRITE_FAILED</span></td>
+                      <td>磁盘或权限错误；文档停留在未保存状态</td>
+                      <td><span class="badge badge-outline">对话框</span> <span class="tiny muted">保存失败</span></td>
+                      <td><span class="code-pill">same</span></td>
+                      <td><span class="badge">M0</span></td>
+                    </tr>
+                    <tr>
+                      <td><span class="code-pill">FILE_TOO_LARGE</span></td>
+                      <td>文档超过 5 MiB（插件预算，与宿主 512 MiB 保存上限无关）</td>
+                      <td><span class="badge badge-outline">对话框</span> <span class="tiny muted">打开与保存</span></td>
+                      <td><span class="code-pill">no</span></td>
+                      <td><span class="badge">M0</span></td>
+                    </tr>
+                    <tr>
+                      <td><span class="code-pill">FILE_UNSUPPORTED</span></td>
+                      <td>不是合法的 <span class="mono">.dbxreport.json</span>；显示解析错误位置</td>
+                      <td><span class="badge badge-outline">全屏阻断</span> <span class="tiny muted">打开失败页</span></td>
+                      <td><span class="code-pill">no</span></td>
+                      <td><span class="badge">M0</span></td>
+                    </tr>
+                    <tr>
+                      <td><span class="code-pill">FILE_HANDLE_EXHAUSTED</span></td>
+                      <td>文件句柄上限 64；旧句柄未释放时重开失败</td>
+                      <td><span class="badge badge-outline">内联</span> <span class="tiny muted">打开文件</span></td>
+                      <td><span class="code-pill">same</span></td>
+                      <td><span class="badge">M0</span></td>
+                    </tr>
+                    <tr>
+                      <td><span class="code-pill">DRAFT_SAVE_FAILED</span></td>
+                      <td><span class="mono">host.storage</span> 写入失败；正文不受影响</td>
+                      <td><span class="badge badge-outline">内联</span> <span class="tiny muted">页面顶部</span></td>
+                      <td><span class="code-pill">same</span></td>
+                      <td><span class="badge">M1</span></td>
+                    </tr>
+                    <tr>
+                      <td><span class="code-pill">BINDING_REQUIRED</span></td>
+                      <td>保存时只记别名，打开后本机还没绑定连接</td>
+                      <td><span class="badge badge-outline">行内</span> <span class="tiny muted">绑定行</span></td>
+                      <td><span class="code-pill">bind</span></td>
+                      <td><span class="badge">M1</span></td>
+                    </tr>
+                    <tr>
+                      <td><span class="code-pill">BINDING_AMBIGUOUS</span></td>
+                      <td>同名/同型候选多于 1 个；不自动挑</td>
+                      <td><span class="badge badge-outline">行内</span> <span class="tiny muted">绑定选择器</span></td>
+                      <td><span class="code-pill">bind</span></td>
+                      <td><span class="badge">M1</span></td>
+                    </tr>
+                    <tr>
+                      <td><span class="code-pill">BINDING_MISMATCH</span></td>
+                      <td>dbType/库/schema 与保存时不同；禁止执行，只显示差异</td>
+                      <td><span class="badge badge-outline">行内</span> <span class="tiny muted">绑定行</span></td>
+                      <td><span class="code-pill">bind</span></td>
+                      <td><span class="badge">M1</span></td>
+                    </tr>
+                    <tr>
+                      <td><span class="code-pill">ABANDONED</span></td>
+                      <td>用户停止等待；响应丢弃，服务端可能仍在执行</td>
+                      <td><span class="badge badge-outline">卡片状态</span> <span class="tiny muted">看板单卡</span></td>
+                      <td><span class="code-pill">same</span></td>
+                      <td><span class="badge">M2</span></td>
+                    </tr>
+                    <tr>
+                      <td><span class="code-pill">FORMAT_VERSION_UNSUPPORTED</span></td>
+                      <td><span class="mono">formatVersion</span> 0.2 高于支持的 0.1；不迁移</td>
+                      <td><span class="badge badge-outline">全屏阻断</span> <span class="tiny muted">打开失败页</span></td>
+                      <td><span class="code-pill">no</span></td>
+                      <td><span class="badge">M1</span></td>
+                    </tr>
+                    <tr>
+                      <td><span class="code-pill">STORAGE_QUOTA</span></td>
+                      <td><span class="mono">host.storage</span> 配额不足（单值 256 KiB / 总量 1 MiB）</td>
+                      <td><span class="badge badge-outline">内联</span> <span class="tiny muted">页面顶部</span></td>
+                      <td><span class="code-pill">same</span></td>
+                      <td><span class="badge">M1</span></td>
+                    </tr>
+                    <tr>
+                      <td><span class="code-pill">AI_UNAVAILABLE</span></td>
+                      <td>AI 功能 M3 才规划；首版没有这个功能</td>
+                      <td><span class="badge badge-outline">未实现</span> <span class="tiny muted">M3 再做</span></td>
+                      <td><span class="code-pill">no</span></td>
+                      <td><span class="badge">M3</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="tiny muted">
+                <span class="code-pill">same</span> 原样重试 ·
+                <span class="code-pill">edit</span> 改 SQL 后重试 ·
+                <span class="code-pill">bind</span> 需绑定 ·
+                <span class="code-pill">confirm</span> 需人工确认 ·
+                <span class="code-pill">no</span> 原样重试无用（不可重试）
+              </div>
+              <div class="tiny muted">
+                no 不代表没有出口：改设置（如 maxRows）、另选文件、升级宿主都算出口；确实无路可走的必须明说「做不到」。M0–M3 是计划里程碑，不是已实现。
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 场景 2：内联错误族 ============ -->
+    <section class="scenario" data-scenario="inline" hidden>
+      <div class="topbar">
+        <span class="title">内联错误族</span>
+        <span class="crumb">数据集 / 报表 / 文档</span>
+        <span class="spacer"></span>
+        <span class="badge">4 段实景</span>
+      </div>
+      <div class="main">
+        <div class="content">
+          <div class="pane-body">
+            <div class="stack-5">
+              <div class="stack">
+                <div class="section-title">① 结果区内联 · QUERY_TIMEOUT</div>
+                <div class="panel">
+                  <div class="panel-head">
+                    <span>结果</span>
+                    <span class="spacer"></span>
+                    <span class="badge badge-outline">旧 · 10:21:10</span>
+                  </div>
+                  <div class="panel-body stack">
+                    <div class="alert alert-err">
+                      <span class="alert-icon">!</span>
+                      <div class="alert-body">
+                        <div class="row">
+                          <span class="code-pill">QUERY_TIMEOUT</span>
+                          <span class="alert-title">已等待 60 s，宿主已停止等待；服务端可能仍在执行</span>
+                        </div>
+                        <span class="muted small">这次响应已丢弃，没有取回任何行；执行上限 60 s，不会自动重试。</span>
+                        <div class="row">
+                          <button class="btn btn-sm" type="button">原样重试</button>
+                          <button class="btn btn-sm" type="button">降低 maxRows</button>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="meta-row">
+                      <span>上次成功的结果保留在下方</span>
+                      <span>·</span>
+                      <span class="badge badge-outline">旧 · 10:21:10</span>
+                      <span>·</span>
+                      <span>已取回 8 行</span>
+                    </div>
+                    <table class="table">
+                      <thead>
+                        <tr>
+                          <th>region</th>
+                          <th>channel</th>
+                          <th class="num">orders</th>
+                          <th class="num">gmv</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td>华东</td>
+                          <td>天猫</td>
+                          <td class="num">1,284</td>
+                          <td class="mono num">1289345.67</td>
+                        </tr>
+                        <tr>
+                          <td>华南</td>
+                          <td>抖音</td>
+                          <td class="num">1,102</td>
+                          <td class="mono num">742180.44</td>
+                        </tr>
+                        <tr>
+                          <td>华东</td>
+                          <td>京东</td>
+                          <td class="num">968</td>
+                          <td class="mono num">986220.10</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <div class="stack">
+                <div class="section-title">② 源绑定行内 · BINDING_REQUIRED</div>
+                <div class="panel">
+                  <div class="list-item">
+                    <span class="dot dot-warn"></span>
+                    <span class="primary">销售库（只读）</span>
+                    <span class="badge badge-warn">未绑定</span>
+                    <span class="secondary">连接：未选择</span>
+                    <span class="spacer"></span>
+                    <span class="tiny muted">只记别名，不记本机连接</span>
+                    <span class="code-pill">BINDING_REQUIRED</span>
+                    <button class="btn btn-sm" type="button">选择连接</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="stack">
+                <div class="section-title">③ 页面顶部轻提示条 · DRAFT_SAVE_FAILED</div>
+                <div class="panel">
+                  <div class="panel-head">
+                    <span>零售经营周报 · 报表设计</span>
+                    <span class="spacer"></span>
+                    <span class="tiny muted">有未保存更改</span>
+                  </div>
+                  <div class="st-notice">
+                    <span class="code-pill">DRAFT_SAVE_FAILED</span>
+                    <span class="strong">草稿未保存，正文不受影响</span>
+                    <span class="muted">重启或关窗后草稿可能丢失，请手动另存</span>
+                    <span class="spacer"></span>
+                    <button class="btn btn-sm" type="button">重试</button>
+                  </div>
+                  <div class="panel-body">
+                    <dl class="kv">
+                      <dt>文档</dt>
+                      <dd>零售经营周报.dbxreport.json</dd>
+                      <dt>上次手动保存</dt>
+                      <dd>10:21:10</dd>
+                      <dt>当前状态</dt>
+                      <dd><span class="badge badge-warn">有未保存更改</span></dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+
+              <div class="stack">
+                <div class="section-title">④ 样本横幅 · QUERY_TRUNCATED</div>
+                <div class="panel">
+                  <div class="panel-head">
+                    <span>结果</span>
+                    <span class="spacer"></span>
+                    <span class="badge badge-warn">样本</span>
+                  </div>
+                  <div class="panel-body stack">
+                    <div class="alert alert-warn">
+                      <span class="alert-icon">!</span>
+                      <div class="alert-body">
+                        <div class="row">
+                          <span class="code-pill">QUERY_TRUNCATED</span>
+                          <span class="alert-title">这是样本：已取回 500 行（上限 500），总计与占比已禁用</span>
+                        </div>
+                        <span class="muted small">不是完整结果；过滤与排序只作用在这 500 行内，合计只认 SQL 里标记的那一行。</span>
+                        <div class="row">
+                          <button class="btn btn-sm" type="button">提高 maxRows</button>
+                          <span class="tiny muted">上限 5000；再大请在 SQL 里聚合</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="meta-row">
+                      <span>已取回 500 行</span>
+                      <span>·</span>
+                      <span>6.7 MiB</span>
+                      <span>·</span>
+                      <span>10:31:02</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 场景 3：对话框族 ============ -->
+    <section class="scenario" data-scenario="dialogs" hidden>
+      <div class="topbar">
+        <span class="title">对话框族</span>
+        <span class="crumb">另存为 / 字段契约 / 丢弃更改</span>
+        <span class="spacer"></span>
+        <span class="badge">2 个真实模态</span>
+      </div>
+      <div class="main">
+        <div class="content">
+          <div class="pane-body">
+            <div class="stack-5">
+              <div class="row between wrap">
+                <div class="section-title">静态缩略：并排看标题与按钮文案（按钮不可用）</div>
+                <span class="ann">口径：另存不覆盖、契约只标差异、丢弃不可撤销</span>
+              </div>
+              <div class="st-dialog-strip">
+                <div class="stack">
+                  <span class="tiny muted">A · 另存为确认</span>
+                  <div class="dialog">
+                    <div class="dialog-head">另存为</div>
+                    <div class="dialog-body stack">
+                      <div class="field">
+                        <span class="label">文件名</span>
+                        <input class="input" type="text" value="零售经营周报.dbxreport.json" readonly />
+                        <span class="hint">类型：.dbxreport.json</span>
+                      </div>
+                      <div class="alert alert-warn">
+                        <span class="alert-icon">!</span>
+                        <div class="alert-body">
+                          <span class="alert-title">保存会生成新文件</span>
+                          <span class="muted small">每次另存都会弹出系统文件框；无法覆盖原文件，也无法拿到保存路径。</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="dialog-foot">
+                      <button class="btn btn-sm" type="button">取消</button>
+                      <button class="btn btn-sm btn-primary" type="button">继续另存…</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="stack">
+                  <span class="tiny muted">B · 重新确认字段契约</span>
+                  <div class="dialog">
+                    <div class="dialog-head">字段契约已变化，需要重新确认</div>
+                    <div class="dialog-body stack">
+                      <span class="small">这次运行返回的列与保存时确认的契约不一致；确认前不会写入保存，也不会改写旧口径。</span>
+                      <table class="table st-mini">
+                        <thead>
+                          <tr>
+                            <th>字段</th>
+                            <th>保存时</th>
+                            <th>本次</th>
+                            <th>变化</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td class="mono">gmv</td>
+                            <td class="mono">decimal(18,2)</td>
+                            <td class="mono">decimal(20,2)</td>
+                            <td>精度提升</td>
+                          </tr>
+                          <tr>
+                            <td class="mono">region</td>
+                            <td class="mono">varchar(16)</td>
+                            <td class="mono">varchar(32) · 可空</td>
+                            <td>长度增加、可空</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                      <span class="tiny muted"><span class="code-pill">SCHEMA_DRIFT</span> 只标差异，不静默更新</span>
+                    </div>
+                    <div class="dialog-foot">
+                      <button class="btn btn-sm" type="button">取消</button>
+                      <button class="btn btn-sm btn-primary" type="button">用新契约重新确认</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="stack">
+                  <span class="tiny muted">C · 丢弃未保存更改</span>
+                  <div class="dialog">
+                    <div class="dialog-head">丢弃未保存的更改？</div>
+                    <div class="dialog-body stack">
+                      <span class="small">以下更改会全部丢失，且无法撤销；不会写入任何文件。</span>
+                      <div class="list">
+                        <div class="list-item">
+                          <span class="primary">数据集「周销售明细」</span>
+                          <span class="spacer"></span>
+                          <span class="secondary">maxRows 500 → 2000</span>
+                        </div>
+                        <div class="list-item">
+                          <span class="primary">报表「各区成交额」</span>
+                          <span class="spacer"></span>
+                          <span class="secondary">Top-N 6 → 8</span>
+                        </div>
+                        <div class="list-item">
+                          <span class="primary">看板「零售经营周报」</span>
+                          <span class="spacer"></span>
+                          <span class="secondary">新增 2 张卡</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="dialog-foot">
+                      <button class="btn btn-sm" type="button">返回</button>
+                      <button class="btn btn-sm btn-danger" type="button">丢弃</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="divider"></div>
+
+              <div class="section-title">真实模态：点按钮打开，Esc / 点背景 / 按钮都能关</div>
+              <div class="row wrap">
+                <button class="btn btn-primary" type="button" data-proto-dialog="dlg-save-as">打开「另存为确认」</button>
+                <button class="btn" type="button" data-proto-dialog="dlg-schema">打开「重新确认字段契约」</button>
+                <button
+                  class="btn"
+                  type="button"
+                  data-proto-toast="已取消，未保存任何文件"
+                >演示 FILE_CANCELED toast</button>
+              </div>
+              <div class="tiny muted">
+                关闭对话框不写入任何文件；取消保存只显示上面那条 toast，不出现「已保存」。toast 3.2 s 后自动消失。
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 场景 4：全屏阻断 ============ -->
+    <section class="scenario" data-scenario="blocked" hidden>
+      <div class="topbar">
+        <span class="title">全屏阻断：没有可继续的操作</span>
+        <span class="spacer"></span>
+        <span class="badge">2 屏</span>
+        <span class="tiny muted">只保留退出动作，不提供重试</span>
+      </div>
+      <div class="main">
+        <div class="content">
+          <div class="pane-body">
+            <div class="stack-5">
+              <div class="tiny muted">
+                这两类问题插件内修不了：重试不会改变宿主能力或文件版本，所以按钮只有离开的办法，没有「仍然继续」「强行打开」。
+              </div>
+              <div class="st-two">
+                <div class="stack">
+                  <div class="section-title">① 宿主能力缺失 · HOST_API_UNSUPPORTED</div>
+                  <div class="panel st-screen">
+                    <div class="empty">
+                      <span class="empty-art">×</span>
+                      <span class="empty-title">当前 DBX 版本不支持数据接口</span>
+                      <p class="empty-desc">
+                        需要 DBX ≥ 0.6.51（Host API ≥ 1.4.0）；当前 0.6.42 / Host API 1.2.0。插件内没有取数的替代办法。
+                      </p>
+                      <span class="code-pill">HOST_API_UNSUPPORTED</span>
+                      <div class="row">
+                        <button class="btn btn-sm" type="button">查看版本详情</button>
+                        <button class="btn btn-sm" type="button">复制诊断信息</button>
+                      </div>
+                      <span class="tiny muted">不提供重试；升级 DBX 后重新打开插件即可</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="stack">
+                  <div class="section-title">② 文件版本过高 · FORMAT_VERSION_UNSUPPORTED</div>
+                  <div class="panel st-screen">
+                    <div class="empty">
+                      <span class="empty-art">↑</span>
+                      <span class="empty-title">文件版本 0.2 高于本插件支持的 0.1</span>
+                      <p class="empty-desc">
+                        零售经营周报.dbxreport.json 的 formatVersion 是 0.2。插件只读 0.1，不会迁移，也不会强行打开高版本文件。
+                      </p>
+                      <span class="code-pill">FORMAT_VERSION_UNSUPPORTED</span>
+                      <div class="row">
+                        <button class="btn btn-sm" type="button">另选文件</button>
+                      </div>
+                      <span class="tiny muted">不支持强行打开；当前没有任何内容被修改</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 场景 5：空态族 ============ -->
+    <section class="scenario" data-scenario="empty" hidden>
+      <div class="topbar">
+        <span class="title">空态族：四种「没有内容」不是同一件事</span>
+        <span class="spacer"></span>
+        <span class="badge">4 态</span>
+        <span class="tiny muted">空态不是失败，也不能写成「完整」</span>
+      </div>
+      <div class="main">
+        <div class="content">
+          <div class="pane-body">
+            <div class="st-empty-grid">
+              <div class="panel st-cell">
+                <div class="empty">
+                  <span class="empty-art">+</span>
+                  <span class="empty-title">还没有打开文档</span>
+                  <p class="empty-desc">
+                    打开本机的 .dbxreport.json，或把文件拖进来。插件不保留最近文件，保存后也拿不到路径。
+                  </p>
+                  <div class="row">
+                    <button class="btn btn-sm btn-primary" type="button">打开文件…</button>
+                    <button class="btn btn-sm" type="button">新建空文档</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="panel st-cell">
+                <div class="empty">
+                  <span class="empty-art">0</span>
+                  <span class="empty-title">查询成功，0 行</span>
+                  <p class="empty-desc">
+                    SQL 已执行并返回 0 行：不是失败、截断或取消。检查 WHERE 条件、时间范围与关联键。
+                  </p>
+                  <div class="row">
+                    <span class="badge badge-ok">已执行 · 412 ms</span>
+                    <span class="tiny muted">已取回 0 行</span>
+                  </div>
+                  <div class="row">
+                    <button class="btn btn-sm" type="button">重新运行</button>
+                    <button class="btn btn-sm" type="button">查看 SQL</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="panel st-cell">
+                <div class="empty">
+                  <span class="empty-art">—</span>
+                  <span class="empty-title">gmv 列全是 NULL</span>
+                  <p class="empty-desc">
+                    已取回 8 行，但 gmv 没有值：图表、合计与占比都不可用。检查聚合列、别名与 LEFT JOIN。
+                  </p>
+                  <div class="row">
+                    <span class="badge badge-warn">指标不可用</span>
+                    <span class="tiny muted">样本行仍然可看</span>
+                  </div>
+                  <div class="row">
+                    <button class="btn btn-sm" type="button">查看样本行</button>
+                    <button class="btn btn-sm" type="button">查看字段契约</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="panel st-cell">
+                <div class="empty">
+                  <span class="empty-art">?</span>
+                  <span class="empty-title">两个连接都叫 pg-sales-prod</span>
+                  <p class="empty-desc">
+                    同名连接不自动挑：库 sales 与 sales_archive 的结果可能不同。选择其中一个后才会执行。
+                  </p>
+                  <div class="st-bind-pick">
+                    <div class="st-bind-row">
+                      <div class="row between">
+                        <span class="primary">pg-sales-prod</span>
+                        <button class="btn btn-sm" type="button">选择其中一个</button>
+                      </div>
+                      <span class="tiny muted">库 sales · 只读账号</span>
+                    </div>
+                    <div class="st-bind-row">
+                      <div class="row between">
+                        <span class="primary">pg-sales-prod</span>
+                        <button class="btn btn-sm" type="button">选择其中一个</button>
+                      </div>
+                      <span class="tiny muted">库 sales_archive · 只读账号</span>
+                    </div>
+                  </div>
+                  <span class="tiny muted"><span class="code-pill">BINDING_AMBIGUOUS</span> 保存时只记别名</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 真实模态：另存为确认 -->
+    <div class="dialog-backdrop" data-dialog="dlg-save-as" hidden>
+      <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-save-as-title">
+        <div class="dialog-head"><span id="dlg-save-as-title">另存为</span></div>
+        <div class="dialog-body stack">
+          <div class="field">
+            <label for="st-save-name">文件名</label>
+            <input class="input" id="st-save-name" type="text" value="零售经营周报.dbxreport.json" />
+            <span class="hint">类型：.dbxreport.json</span>
+          </div>
+          <div class="alert alert-warn">
+            <span class="alert-icon">!</span>
+            <div class="alert-body">
+              <span class="alert-title">保存会生成新文件</span>
+              <span class="muted small">每次另存都会弹出系统文件框；无法覆盖原文件，也无法拿到保存路径。</span>
+            </div>
+          </div>
+        </div>
+        <div class="dialog-foot">
+          <button class="btn" type="button" data-proto-close>取消</button>
+          <button class="btn btn-primary" type="button" data-proto-close>继续另存…</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 真实模态：重新确认字段契约 -->
+    <div class="dialog-backdrop" data-dialog="dlg-schema" hidden>
+      <div class="dialog wide" role="dialog" aria-modal="true" aria-labelledby="dlg-schema-title">
+        <div class="dialog-head"><span id="dlg-schema-title">字段契约已变化，需要重新确认</span></div>
+        <div class="dialog-body stack">
+          <span class="small">这次运行返回的列与保存时确认的契约不一致；确认前不会写入保存，也不会改写旧口径。</span>
+          <table class="table st-mini">
+            <thead>
+              <tr>
+                <th>字段</th>
+                <th>保存时</th>
+                <th>本次运行</th>
+                <th>变化</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="mono">gmv</td>
+                <td class="mono">decimal(18,2)</td>
+                <td class="mono">decimal(20,2)</td>
+                <td>精度提升</td>
+              </tr>
+              <tr>
+                <td class="mono">region</td>
+                <td class="mono">varchar(16)</td>
+                <td class="mono">varchar(32) · 可空</td>
+                <td>长度增加、可空</td>
+              </tr>
+            </tbody>
+          </table>
+          <span class="tiny muted"><span class="code-pill">SCHEMA_DRIFT</span> 只标差异，不静默更新</span>
+        </div>
+        <div class="dialog-foot">
+          <button class="btn" type="button" data-proto-close>取消</button>
+          <button class="btn btn-primary" type="button" data-proto-close>用新契约重新确认</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="../proto.js"></script>
+    <script src="../mock.js"></script>
+    <script>
+      window.PROTO_SCENARIOS = [
+        { id: "codes", label: "错误码总表" },
+        { id: "inline", label: "内联错误" },
+        { id: "dialogs", label: "对话框" },
+        { id: "blocked", label: "全屏阻断" },
+        { id: "empty", label: "空态" }
+      ];
+    </script>
+  </body>
+</html>

@@ -48,7 +48,7 @@
 | PandasAI | 23.9k | 自然语言→数据操作 | Python 运行时、代码执行 |
 | Cube | 21.0k | 语义层/指标 API 概念 | 独立语义层服务、缓存、权限 |
 
-## 2. 对 dbx-report 的结论
+## 2. 对 dbx-plugin-report 的结论
 
 1. **能做的是“本地、作者驱动、只读”的报表闭环**，不是上述产品的服务端能力集合。宿主限制（无 bind/取消/分页/资产 API/调度/共享）决定首版只能做小闭环。
 2. **可借鉴的结构**：查询与呈现分离（Evidence/Metabase）、报表/看板两级（Metabase/Superset）、指标字段契约（Cube/WrenAI 的“语义”概念）、逐卡状态与显式刷新（Rill）。

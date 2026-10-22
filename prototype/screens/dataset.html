@@ -1,0 +1,1072 @@
+<!doctype html>
+<html lang="zh-CN" data-dbx-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>数据集 / SQL 与样本 · dbx-plugin-report 原型 v1</title>
+    <link rel="stylesheet" href="../tokens.css" />
+    <link rel="stylesheet" href="../app.css" />
+    <style>
+      /* 本页专用布局类（.ds-*）：app.css 缺少的组件只在本页补 */
+      .ds-side-scroll {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+      }
+
+      .ds-dataset-list .list-item {
+        align-items: flex-start;
+      }
+
+      .ds-dataset-list .list-item .secondary {
+        margin-top: 1px;
+      }
+
+      /* 上半区：SQL 面板固定高度，结果面板吃掉剩余空间，靠内部滚动，不推高整页 */
+      .ds-sql {
+        flex: 0 0 220px;
+        min-width: 0;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        border-bottom: 1px solid var(--color-border);
+      }
+
+      .ds-sql-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: auto;
+        padding: var(--gap-3) var(--gap-4);
+        display: flex;
+        flex-direction: column;
+        gap: var(--gap-2);
+      }
+
+      .ds-editor {
+        flex: 1 1 auto;
+        min-height: 96px;
+        resize: none;
+      }
+
+      .ds-hintline {
+        display: flex;
+        align-items: center;
+        gap: var(--gap-3);
+        flex-wrap: wrap;
+      }
+
+      .ds-result {
+        flex: 1 1 auto;
+        min-height: 0;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .ds-result-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: auto;
+        padding: var(--gap-4);
+        display: flex;
+        flex-direction: column;
+        gap: var(--gap-4);
+      }
+
+      /* 空态撑满结果区（.empty 自带 height:100%，这里改由 flex 分配） */
+      .ds-empty {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+      }
+
+      .ds-empty > .empty {
+        height: auto;
+        width: 100%;
+        flex: 1 1 auto;
+      }
+
+      .ds-run-state {
+        display: flex;
+        flex-direction: column;
+        gap: var(--gap-3);
+        padding: var(--gap-4);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        background: var(--color-card);
+      }
+
+      .ds-progress {
+        width: 320px;
+        max-width: 100%;
+      }
+
+      .ds-progress > i {
+        width: 64%;
+      }
+
+      /* 结果底栏：样本元信息 + 下一步动作，靠 · 分隔，不吃主行高 */
+      .ds-foot {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        gap: var(--gap-2);
+        flex-wrap: wrap;
+        padding: var(--gap-2) var(--gap-4);
+        border-top: 1px solid var(--color-border);
+        font-size: var(--fs-11);
+        color: var(--color-muted-foreground);
+      }
+
+      .ds-foot .sep {
+        opacity: 0.5;
+      }
+
+      .ds-foot .actions {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: var(--gap-3);
+      }
+
+      /* 宿主返回原文：等宽只读块，超长内部滚动 */
+      .ds-host {
+        margin: 0;
+        padding: var(--gap-3);
+        max-height: 116px;
+        overflow: auto;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-sm);
+        background: var(--color-muted);
+        font-family: var(--font-mono);
+        font-size: var(--fs-11);
+        line-height: 1.6;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      /* 失败的上一份结果：保留但明显标旧 */
+      .ds-stale {
+        opacity: 0.55;
+      }
+
+      .ds-stale-table {
+        max-height: 124px;
+      }
+
+      /* 契约表吃掉剩余高度，说明与确认动作条贴在一起，避免中间出现大段空白 */
+      .ds-contract-wrap {
+        flex: 1 1 auto;
+      }
+
+      /* 标注在提示框里时不要拉伸成一整行 */
+      .alert-body > .ann {
+        align-self: flex-start;
+      }
+
+      .ds-contract-table {
+        table-layout: fixed;
+      }
+
+      .ds-contract-table .c-name {
+        width: 180px;
+      }
+
+      .ds-contract-table .c-transport {
+        width: 160px;
+      }
+
+      .ds-contract-table .c-nullable {
+        width: 84px;
+      }
+
+      .ds-contract-table .c-precision {
+        width: 96px;
+      }
+
+      .ds-contract-table .c-role {
+        width: 90px;
+      }
+
+      .ds-contract-table .c-unit {
+        width: 90px;
+      }
+
+      .ds-contract-foot {
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: var(--gap-2);
+        padding: var(--gap-3) var(--gap-4);
+        border-top: 1px solid var(--color-border);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 原型工具条：场景切换 / 主题 / 返回索引（真机删除） -->
+    <div class="proto-bar">
+      <span class="proto-brand">原型 v1</span>
+      <span class="proto-page">数据集</span>
+      <div class="seg" data-proto-scenarios></div>
+      <span id="proto-scenario-caption" class="tiny"></span>
+      <span class="spacer"></span>
+      <button type="button" class="btn btn-ghost btn-sm" data-proto-theme>暗色</button>
+      <a class="btn btn-ghost btn-sm" href="../index.html">索引</a>
+    </div>
+
+    <!-- 场景 1：未绑定 —— 源连接没绑，运行入口禁用 -->
+    <section class="scenario" data-scenario="idle">
+      <div class="topbar">
+        <span class="title">周销售明细（区域×渠道）</span>
+        <span class="crumb">零售经营周报.dbxreport.json</span>
+        <span class="spacer"></span>
+        <span class="tiny muted">源未绑定，运行被阻断</span>
+        <button type="button" class="btn" disabled>运行</button>
+      </div>
+      <div class="main">
+        <!-- 左栏：数据集列表 + 运行设置（未绑定时设置仍可改，运行不可） -->
+        <aside class="sidebar">
+          <div class="pane-head">
+            数据集
+            <span class="spacer"></span>
+            <span class="tiny muted">2</span>
+          </div>
+          <div class="ds-side-scroll">
+            <div class="list ds-dataset-list">
+              <div class="list-item" aria-selected="true">
+                <span class="dot dot-warn"></span>
+                <div class="grow">
+                  <div class="primary">周销售明细（区域×渠道）</div>
+                  <div class="secondary">5 列 · 口径已确认 · 源未绑定</div>
+                </div>
+              </div>
+              <div class="list-item">
+                <div class="grow">
+                  <div class="primary">履约日报</div>
+                  <div class="secondary">7 列 · 口径未确认</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">运行设置</div>
+              <div class="field">
+                <label for="idle-maxrows">maxRows</label>
+                <input id="idle-maxrows" class="input num" type="text" value="500" />
+                <div class="hint">上限 5000；>2000 会提示</div>
+              </div>
+              <div class="field">
+                <label for="idle-timeout">timeoutMs</label>
+                <input id="idle-timeout" class="input num" type="text" value="30000" />
+                <div class="hint">上限 60000</div>
+              </div>
+              <div class="field">
+                <label>源连接</label>
+                <div class="row small">
+                  <span class="dot dot-idle"></span>
+                  <span class="mono">src_sales</span>
+                  <span class="tiny muted">未绑定</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <!-- 右栏：SQL 面板 + 结果面板 -->
+        <div class="content">
+          <div class="ds-sql">
+            <div class="pane-head">
+              取数 SQL
+              <span class="badge badge-outline">只读</span>
+              <span class="spacer"></span>
+              <span class="tiny muted">
+                源 <span class="mono">src_sales</span> → <span class="mono">sales.orders</span>
+              </span>
+            </div>
+            <div class="ds-sql-body">
+              <textarea class="textarea code ds-editor" spellcheck="false">
+SELECT region, channel, COUNT(*) AS orders, SUM(gmv) AS gmv,
+       ROUND(SUM(gmv) / NULLIF(COUNT(*), 0), 2) AS aov
+FROM sales.orders
+WHERE paid_at >= DATE '2026-10-14' AND status = 'paid'
+GROUP BY region, channel
+ORDER BY gmv DESC</textarea
+              >
+              <div class="ds-hintline">
+                <span class="tiny muted">单条只读 · ≤100000 字符 · timeout 上限 60 s</span>
+                <span class="spacer"></span>
+                <span class="tiny muted">未取数</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="ds-result">
+            <div class="pane-head">样本结果</div>
+            <div class="ds-result-body">
+              <div class="alert alert-warn">
+                <span class="alert-icon">!</span>
+                <div class="alert-body">
+                  <span class="alert-title">
+                    源连接未绑定
+                    <span class="code-pill">BINDING_REQUIRED</span>
+                  </span>
+                  <span class="muted small">
+                    先给 <span class="mono">src_sales</span> 绑定本机连接，运行按钮才会可用。绑定在「源绑定」里做。
+                  </span>
+                </div>
+                <a class="btn btn-sm" href="workbench.html?scenario=binding">去工作台 · 源绑定</a>
+              </div>
+
+              <div class="ds-empty">
+                <div class="empty">
+                  <div class="empty-art" aria-hidden="true">
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <ellipse cx="12" cy="6" rx="7" ry="3"></ellipse>
+                      <path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"></path>
+                      <path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"></path>
+                    </svg>
+                  </div>
+                  <div class="empty-title">还没有取到样本</div>
+                  <p class="empty-desc">
+                    绑定源连接后运行这条 SQL，这里会显示已取回的行，以及每列的 transport 与字段契约。
+                  </p>
+                  <p class="tiny muted">结果只在窗口里看，不会写到文件</p>
+                  <span class="ann">源未绑定就不预置假结果，运行入口保持禁用</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 场景 2：运行中 —— 只有「停止等待」，没有取消 -->
+    <section class="scenario" data-scenario="running">
+      <div class="topbar">
+        <span class="title">周销售明细（区域×渠道）</span>
+        <span class="crumb">零售经营周报.dbxreport.json</span>
+        <span class="spacer"></span>
+        <span class="ann">没有 cancel：停止只停止等待，不保证数据库停下</span>
+        <button type="button" class="btn">停止等待</button>
+      </div>
+      <div class="main">
+        <!-- 左栏：运行中设置只读 -->
+        <aside class="sidebar">
+          <div class="pane-head">
+            数据集
+            <span class="spacer"></span>
+            <span class="tiny muted">2</span>
+          </div>
+          <div class="ds-side-scroll">
+            <div class="list ds-dataset-list">
+              <div class="list-item" aria-selected="true">
+                <span class="dot dot-warn"></span>
+                <div class="grow">
+                  <div class="primary">周销售明细（区域×渠道）</div>
+                  <div class="secondary">5 列 · 取数中</div>
+                </div>
+              </div>
+              <div class="list-item">
+                <div class="grow">
+                  <div class="primary">履约日报</div>
+                  <div class="secondary">7 列 · 口径未确认</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">运行设置</div>
+              <div class="field">
+                <label for="run-maxrows">maxRows</label>
+                <input id="run-maxrows" class="input num" type="text" value="500" disabled />
+                <div class="hint">上限 5000；>2000 会提示</div>
+              </div>
+              <div class="field">
+                <label for="run-timeout">timeoutMs</label>
+                <input id="run-timeout" class="input num" type="text" value="30000" disabled />
+                <div class="hint">上限 60000</div>
+              </div>
+              <div class="field">
+                <label>源连接</label>
+                <div class="row small">
+                  <span class="dot dot-ok"></span>
+                  <span class="mono">src_sales</span>
+                  <span class="tiny muted">pg-sales-prod · 库 sales</span>
+                </div>
+                <div class="hint">运行中不可改取数参数</div>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <div class="content">
+          <div class="ds-sql">
+            <div class="pane-head">
+              取数 SQL
+              <span class="badge badge-outline">只读</span>
+              <span class="spacer"></span>
+              <span class="tiny muted">
+                源 <span class="mono">src_sales</span> → <span class="mono">sales.orders</span>
+              </span>
+            </div>
+            <div class="ds-sql-body">
+              <textarea class="textarea code ds-editor" spellcheck="false">
+SELECT region, channel, COUNT(*) AS orders, SUM(gmv) AS gmv,
+       ROUND(SUM(gmv) / NULLIF(COUNT(*), 0), 2) AS aov
+FROM sales.orders
+WHERE paid_at >= DATE '2026-10-14' AND status = 'paid'
+GROUP BY region, channel
+ORDER BY gmv DESC</textarea
+              >
+              <div class="ds-hintline">
+                <span class="tiny muted">单条只读 · ≤100000 字符 · timeout 上限 60 s</span>
+                <span class="spacer"></span>
+                <span class="tiny muted">执行中，编辑不影响这一次取数</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="ds-result">
+            <div class="pane-head">
+              样本结果
+              <span class="badge badge-warn">执行中</span>
+              <span class="spacer"></span>
+              <span class="tiny muted">源 <span class="mono">src_sales</span></span>
+            </div>
+            <div class="ds-result-body">
+              <div class="ds-run-state">
+                <div class="row small">
+                  <span class="dot dot-warn"></span>
+                  <span class="strong">正在执行 · 已等待 3.2 s · 队列 1/2</span>
+                </div>
+                <div class="progress ds-progress"><i></i></div>
+                <div class="tiny muted">
+                  停止只是停止等待：响应会被丢弃，数据库可能仍在执行。到这里之前的结果不会覆盖上次的样本。
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 场景 3：成功 —— 已取回样本、未截断 -->
+    <section class="scenario" data-scenario="ok">
+      <div class="topbar">
+        <span class="title">周销售明细（区域×渠道）</span>
+        <span class="crumb">零售经营周报.dbxreport.json</span>
+        <span class="spacer"></span>
+        <button type="button" class="btn btn-primary" data-goto-scenario="running">运行</button>
+      </div>
+      <div class="main">
+        <!-- 左栏：数据集列表 + 运行设置 -->
+        <aside class="sidebar">
+          <div class="pane-head">
+            数据集
+            <span class="spacer"></span>
+            <span class="tiny muted">2</span>
+          </div>
+          <div class="ds-side-scroll">
+            <div class="list ds-dataset-list">
+              <div class="list-item" aria-selected="true">
+                <span class="dot dot-ok"></span>
+                <div class="grow">
+                  <div class="primary">周销售明细（区域×渠道）</div>
+                  <div class="secondary">5 列 · 源 1 · 口径已确认</div>
+                </div>
+              </div>
+              <div class="list-item">
+                <div class="grow">
+                  <div class="primary">履约日报</div>
+                  <div class="secondary">7 列 · 口径未确认</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">运行设置</div>
+              <div class="field">
+                <label for="ok-maxrows">maxRows</label>
+                <input id="ok-maxrows" class="input num" type="text" value="500" />
+                <div class="hint">上限 5000；>2000 会提示</div>
+              </div>
+              <div class="field">
+                <label for="ok-timeout">timeoutMs</label>
+                <input id="ok-timeout" class="input num" type="text" value="30000" />
+                <div class="hint">上限 60000</div>
+              </div>
+              <div class="field">
+                <label>源连接</label>
+                <div class="row small">
+                  <span class="dot dot-ok"></span>
+                  <span class="mono">src_sales</span>
+                  <span class="tiny muted">pg-sales-prod · 库 sales</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <div class="content">
+          <div class="ds-sql">
+            <div class="pane-head">
+              取数 SQL
+              <span class="badge badge-outline">只读</span>
+              <span class="spacer"></span>
+              <span class="tiny muted">
+                源 <span class="mono">src_sales</span> → <span class="mono">sales.orders</span>
+              </span>
+            </div>
+            <div class="ds-sql-body">
+              <textarea class="textarea code ds-editor" spellcheck="false">
+SELECT region, channel, COUNT(*) AS orders, SUM(gmv) AS gmv,
+       ROUND(SUM(gmv) / NULLIF(COUNT(*), 0), 2) AS aov
+FROM sales.orders
+WHERE paid_at >= DATE '2026-10-14' AND status = 'paid'
+GROUP BY region, channel
+ORDER BY gmv DESC</textarea
+              >
+              <div class="ds-hintline">
+                <span class="tiny muted">单条只读 · ≤100000 字符 · timeout 上限 60 s</span>
+                <span class="spacer"></span>
+                <span class="tiny muted">改 SQL 后需重新运行，当前样本会标旧</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="ds-result">
+            <div class="pane-head">
+              <div class="seg" role="tablist" aria-label="结果视图">
+                <button type="button" role="tab" aria-pressed="true">样本结果</button>
+                <button type="button" role="tab" aria-pressed="false" data-tab-scenario="contract">
+                  字段契约
+                </button>
+              </div>
+              <span class="badge badge-ok">已取回 8 行 · 412 ms</span>
+              <span class="spacer"></span>
+              <span class="ann">结果只在窗口里看，不落地成文件</span>
+            </div>
+            <div class="ds-result-body">
+              <div class="table-wrap">
+                <div data-table="sample"></div>
+              </div>
+            </div>
+            <div class="ds-foot">
+              <span>序列化 1.2 KiB</span>
+              <span class="sep">·</span>
+              <span>列 5</span>
+              <span class="sep">·</span>
+              <span>maxRows 500（未截断）</span>
+              <span class="sep">·</span>
+              <span>取数 10:23:58</span>
+              <span class="actions">
+                <span class="tiny muted">样本行数就是取回行数</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 场景 4：截断 —— 结果是样本，总计/占比/其他桶禁用 -->
+    <section class="scenario" data-scenario="truncated">
+      <div class="topbar">
+        <span class="title">周销售明细（区域×渠道）</span>
+        <span class="crumb">零售经营周报.dbxreport.json</span>
+        <span class="spacer"></span>
+        <button type="button" class="btn btn-primary" data-goto-scenario="running">运行</button>
+      </div>
+      <div class="main">
+        <aside class="sidebar">
+          <div class="pane-head">
+            数据集
+            <span class="spacer"></span>
+            <span class="tiny muted">2</span>
+          </div>
+          <div class="ds-side-scroll">
+            <div class="list ds-dataset-list">
+              <div class="list-item" aria-selected="true">
+                <span class="dot dot-warn"></span>
+                <div class="grow">
+                  <div class="primary">周销售明细（区域×渠道）</div>
+                  <div class="secondary">5 列 · 样本已截断</div>
+                </div>
+              </div>
+              <div class="list-item">
+                <div class="grow">
+                  <div class="primary">履约日报</div>
+                  <div class="secondary">7 列 · 口径未确认</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">运行设置</div>
+              <div class="field">
+                <label for="tr-maxrows">maxRows</label>
+                <input id="tr-maxrows" class="input num" type="text" value="500" />
+                <div class="hint">上限 5000；>2000 会提示</div>
+              </div>
+              <div class="field">
+                <label for="tr-timeout">timeoutMs</label>
+                <input id="tr-timeout" class="input num" type="text" value="30000" />
+                <div class="hint">上限 60000</div>
+              </div>
+              <div class="field">
+                <label>源连接</label>
+                <div class="row small">
+                  <span class="dot dot-ok"></span>
+                  <span class="mono">src_sales</span>
+                  <span class="tiny muted">pg-sales-prod · 库 sales</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <div class="content">
+          <div class="ds-sql">
+            <div class="pane-head">
+              取数 SQL
+              <span class="badge badge-outline">只读</span>
+              <span class="spacer"></span>
+              <span class="tiny muted">
+                源 <span class="mono">src_sales</span> → <span class="mono">sales.orders</span>
+              </span>
+            </div>
+            <div class="ds-sql-body">
+              <textarea class="textarea code ds-editor" spellcheck="false">
+SELECT region, channel, COUNT(*) AS orders, SUM(gmv) AS gmv,
+       ROUND(SUM(gmv) / NULLIF(COUNT(*), 0), 2) AS aov
+FROM sales.orders
+WHERE paid_at >= DATE '2026-10-14' AND status = 'paid'
+GROUP BY region, channel
+ORDER BY gmv DESC</textarea
+              >
+              <div class="ds-hintline">
+                <span class="tiny muted">单条只读 · ≤100000 字符 · timeout 上限 60 s</span>
+                <span class="spacer"></span>
+                <span class="tiny muted">截断与 SQL 无关：是 maxRows 取数上限</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="ds-result">
+            <div class="pane-head">
+              <div class="seg" role="tablist" aria-label="结果视图">
+                <button type="button" role="tab" aria-pressed="true">样本结果</button>
+                <button type="button" role="tab" aria-pressed="false" data-tab-scenario="contract">
+                  字段契约
+                </button>
+              </div>
+              <span class="badge badge-warn">已截断</span>
+              <span class="spacer"></span>
+              <span class="tiny muted">取数 10:31:02</span>
+            </div>
+            <div class="ds-result-body">
+              <div class="alert alert-warn">
+                <span class="alert-icon">!</span>
+                <div class="alert-body">
+                  <span class="alert-title">
+                    这是样本：已取回 500 行（上限 500），不是完整结果
+                    <span class="code-pill">QUERY_TRUNCATED</span>
+                  </span>
+                  <span class="muted small">
+                    总计、占比、其他桶 已禁用。要看总量请在 SQL 里聚合，或提高 maxRows 后再取一次。
+                  </span>
+                  <span class="ann">截断结果只当样本：样本行之和 ≠ 总体，所以不开总计与占比</span>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <div data-table="sample"></div>
+              </div>
+            </div>
+            <div class="ds-foot">
+              <span>序列化 6.7 MiB</span>
+              <span class="sep">·</span>
+              <span>列 5</span>
+              <span class="sep">·</span>
+              <span>maxRows 500（已截断）</span>
+              <span class="sep">·</span>
+              <span>取数 10:31:02</span>
+              <span class="sep">·</span>
+              <span>还有更多行未取回</span>
+              <span class="actions">
+                <button type="button" class="btn btn-sm">提高 maxRows…</button>
+                <button type="button" class="btn btn-sm">在 SQL 里聚合</button>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 场景 5：失败 —— 宿主返回原文 + 上次结果保留并标旧 -->
+    <section class="scenario" data-scenario="error">
+      <div class="topbar">
+        <span class="title">周销售明细（区域×渠道）</span>
+        <span class="crumb">零售经营周报.dbxreport.json</span>
+        <span class="spacer"></span>
+        <button type="button" class="btn btn-primary" data-goto-scenario="running">运行</button>
+      </div>
+      <div class="main">
+        <aside class="sidebar">
+          <div class="pane-head">
+            数据集
+            <span class="spacer"></span>
+            <span class="tiny muted">2</span>
+          </div>
+          <div class="ds-side-scroll">
+            <div class="list ds-dataset-list">
+              <div class="list-item" aria-selected="true">
+                <span class="dot dot-err"></span>
+                <div class="grow">
+                  <div class="primary">周销售明细（区域×渠道）</div>
+                  <div class="secondary">5 列 · 上次取数失败</div>
+                </div>
+              </div>
+              <div class="list-item">
+                <div class="grow">
+                  <div class="primary">履约日报</div>
+                  <div class="secondary">7 列 · 口径未确认</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">运行设置</div>
+              <div class="field">
+                <label for="err-maxrows">maxRows</label>
+                <input id="err-maxrows" class="input num" type="text" value="500" />
+                <div class="hint">上限 5000；>2000 会提示</div>
+              </div>
+              <div class="field">
+                <label for="err-timeout">timeoutMs</label>
+                <input id="err-timeout" class="input num" type="text" value="30000" />
+                <div class="hint">上限 60000</div>
+              </div>
+              <div class="field">
+                <label>源连接</label>
+                <div class="row small">
+                  <span class="dot dot-ok"></span>
+                  <span class="mono">src_sales</span>
+                  <span class="tiny muted">pg-sales-prod · 库 sales</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <div class="content">
+          <div class="ds-sql">
+            <div class="pane-head">
+              取数 SQL
+              <span class="badge badge-err">只读校验未通过</span>
+              <span class="spacer"></span>
+              <span class="tiny muted">
+                源 <span class="mono">src_sales</span> → <span class="mono">sales.orders</span>
+              </span>
+            </div>
+            <div class="ds-sql-body">
+              <textarea class="textarea code ds-editor" spellcheck="false">
+SELECT region, channel, COUNT(*) AS orders, SUM(gmv) AS gmv
+INTO sales.tmp_region_gmv
+FROM sales.orders
+WHERE paid_at >= DATE '2026-10-14'
+GROUP BY region, channel</textarea
+              >
+              <div class="ds-hintline">
+                <span class="tiny muted">单条只读 · ≤100000 字符 · timeout 上限 60 s</span>
+                <span class="spacer"></span>
+                <span class="tiny muted">改回纯 SELECT 再运行</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="ds-result">
+            <div class="pane-head">
+              <div class="seg" role="tablist" aria-label="结果视图">
+                <button type="button" role="tab" aria-pressed="true">样本结果</button>
+                <button type="button" role="tab" aria-pressed="false" data-tab-scenario="contract">
+                  字段契约
+                </button>
+              </div>
+              <span class="badge badge-err">运行失败</span>
+              <span class="spacer"></span>
+              <span class="tiny muted">10:27:05</span>
+            </div>
+            <div class="ds-result-body">
+              <div class="alert alert-err">
+                <span class="alert-icon">×</span>
+                <div class="alert-body">
+                  <span class="alert-title">
+                    <span class="code-pill">SQL_REJECTED</span>
+                    这条 SQL 没通过只读校验，没有执行
+                  </span>
+                  <span class="muted small">
+                    <span class="mono">INTO</span> 会创建表
+                    <span class="mono">sales.tmp_region_gmv</span>，不属于只读语句。去掉
+                    <span class="mono">INTO</span> 改成纯 SELECT 后重试。
+                  </span>
+                </div>
+                <button type="button" class="btn btn-sm btn-primary">修改 SQL</button>
+              </div>
+
+              <pre class="ds-host">ERROR  SQL_REJECTED
+只读分类未通过：SELECT INTO sales.tmp_region_gmv 会创建表
+DETAIL  只接受单条只读 SELECT；插件无法替你确认副作用
+HINT    去掉 INTO 与目标表，改成纯 SELECT 后重新运行</pre>
+
+              <div class="row small">
+                <span class="badge badge-outline">旧</span>
+                <span class="muted">上次结果保留（10:21:10）· 不是这次 SQL 的结果</span>
+              </div>
+              <div class="table-wrap ds-stale ds-stale-table">
+                <div data-table="sample"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 场景 6：字段契约 —— transport / nullable / 精度 / 角色 -->
+    <section class="scenario" data-scenario="contract">
+      <div class="topbar">
+        <span class="title">周销售明细（区域×渠道）</span>
+        <span class="crumb">零售经营周报.dbxreport.json</span>
+        <span class="spacer"></span>
+        <span class="tiny muted">确认后写入 dataset.basis</span>
+        <button type="button" class="btn btn-primary" data-goto-scenario="running">运行</button>
+      </div>
+      <div class="main">
+        <aside class="sidebar">
+          <div class="pane-head">
+            数据集
+            <span class="spacer"></span>
+            <span class="tiny muted">2</span>
+          </div>
+          <div class="ds-side-scroll">
+            <div class="list ds-dataset-list">
+              <div class="list-item" aria-selected="true">
+                <span class="dot dot-ok"></span>
+                <div class="grow">
+                  <div class="primary">周销售明细（区域×渠道）</div>
+                  <div class="secondary">5 列 · 契约待确认</div>
+                </div>
+              </div>
+              <div class="list-item">
+                <div class="grow">
+                  <div class="primary">履约日报</div>
+                  <div class="secondary">7 列 · 口径未确认</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">运行设置</div>
+              <div class="field">
+                <label for="ct-maxrows">maxRows</label>
+                <input id="ct-maxrows" class="input num" type="text" value="500" />
+                <div class="hint">上限 5000；>2000 会提示</div>
+              </div>
+              <div class="field">
+                <label for="ct-timeout">timeoutMs</label>
+                <input id="ct-timeout" class="input num" type="text" value="30000" />
+                <div class="hint">上限 60000</div>
+              </div>
+              <div class="field">
+                <label>源连接</label>
+                <div class="row small">
+                  <span class="dot dot-ok"></span>
+                  <span class="mono">src_sales</span>
+                  <span class="tiny muted">pg-sales-prod · 库 sales</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <div class="content">
+          <div class="ds-sql">
+            <div class="pane-head">
+              取数 SQL
+              <span class="badge badge-outline">只读</span>
+              <span class="spacer"></span>
+              <span class="tiny muted">
+                源 <span class="mono">src_sales</span> → <span class="mono">sales.orders</span>
+              </span>
+            </div>
+            <div class="ds-sql-body">
+              <textarea class="textarea code ds-editor" spellcheck="false">
+SELECT region, channel, COUNT(*) AS orders, SUM(gmv) AS gmv,
+       ROUND(SUM(gmv) / NULLIF(COUNT(*), 0), 2) AS aov
+FROM sales.orders
+WHERE paid_at >= DATE '2026-10-14' AND status = 'paid'
+GROUP BY region, channel
+ORDER BY gmv DESC</textarea
+              >
+              <div class="ds-hintline">
+                <span class="tiny muted">单条只读 · ≤100000 字符 · timeout 上限 60 s</span>
+                <span class="spacer"></span>
+                <span class="tiny muted">契约按这条 SQL 的输出字段生成</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="ds-result">
+            <div class="pane-head">
+              <div class="seg" role="tablist" aria-label="结果视图">
+                <button type="button" role="tab" aria-pressed="false" data-tab-scenario="ok">
+                  样本结果
+                </button>
+                <button type="button" role="tab" aria-pressed="true">字段契约</button>
+              </div>
+              <span class="badge badge-info">待确认</span>
+              <span class="spacer"></span>
+              <span class="tiny muted">依据 10:23:58 的样本</span>
+            </div>
+
+            <div class="ds-result-body">
+              <div class="table-wrap ds-contract-wrap">
+                <table class="table ds-contract-table">
+                  <colgroup>
+                    <col class="c-name" />
+                    <col class="c-transport" />
+                    <col class="c-nullable" />
+                    <col class="c-precision" />
+                    <col class="c-role" />
+                    <col class="c-unit" />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th>字段名</th>
+                      <th>transport</th>
+                      <th>nullable</th>
+                      <th>精度</th>
+                      <th>角色</th>
+                      <th>单位</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="mono">region</td>
+                      <td><span class="code-pill">string</span></td>
+                      <td>否</td>
+                      <td><span class="null">—</span></td>
+                      <td>维度</td>
+                      <td><span class="null">—</span></td>
+                    </tr>
+                    <tr>
+                      <td class="mono">channel</td>
+                      <td><span class="code-pill">string</span></td>
+                      <td>是</td>
+                      <td><span class="null">—</span></td>
+                      <td>维度</td>
+                      <td><span class="null">—</span></td>
+                    </tr>
+                    <tr>
+                      <td class="mono">orders</td>
+                      <td><span class="code-pill">integer_string</span></td>
+                      <td>否</td>
+                      <td>整数</td>
+                      <td>指标</td>
+                      <td>单</td>
+                    </tr>
+                    <tr>
+                      <td class="mono">gmv</td>
+                      <td><span class="code-pill">decimal_string</span></td>
+                      <td>否</td>
+                      <td>p18·s2</td>
+                      <td>指标</td>
+                      <td>元</td>
+                    </tr>
+                    <tr>
+                      <td class="mono">aov</td>
+                      <td><span class="code-pill">decimal_string</span></td>
+                      <td>是</td>
+                      <td>p18·s2</td>
+                      <td>指标</td>
+                      <td>元/单</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="alert alert-info">
+                <span class="alert-icon">i</span>
+                <div class="alert-body">
+                  <span>
+                    <span class="mono">gmv</span>、<span class="mono">aov</span> 是字符串承载小数
+                    （<span class="mono">decimal_string</span>），<span class="mono">orders</span> 是
+                    <span class="mono">integer_string</span>：插件不把它们转成 number，避免精度丢失。
+                  </span>
+                  <span class="muted small">
+                    <span class="mono">date_string</span> 字段按 Asia/Shanghai 解释；日期不参与数值计算。
+                  </span>
+                  <span class="ann">data-model 的 transport 枚举未含 string：文本列是否标 transport 需拍板（现在按 string 展示）</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="ds-contract-foot">
+              <div class="row">
+                <button type="button" class="btn btn-primary" data-goto-scenario="ok">
+                  确认字段契约
+                </button>
+                <span class="tiny muted">
+                  确认后生成口径绑定 basis：<span class="mono">q_8f21ac / f_2d90b1 / 2026-10-22 10:24</span>
+                </span>
+              </div>
+              <div class="tiny muted">
+                basis 只记录 SQL 与字段的指纹；下次取回不一致时会标 stale，不静默更新。
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <script src="../proto.js"></script>
+    <script src="../mock.js"></script>
+    <script>
+      // 场景顺序即原型工具条里的按钮顺序；第一个是默认场景
+      window.PROTO_SCENARIOS = [
+        { id: "idle", label: "未绑定" },
+        { id: "running", label: "运行中" },
+        { id: "ok", label: "成功" },
+        { id: "truncated", label: "截断" },
+        { id: "error", label: "失败" },
+        { id: "contract", label: "字段契约" }
+      ];
+
+      // 原型内跳转（不是产品逻辑）：场景按钮、结果 tab
+      document.querySelectorAll("[data-goto-scenario], [data-tab-scenario]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          Proto.scenario(btn.dataset.gotoScenario || btn.dataset.tabScenario);
+        });
+      });
+
+      // 支持从别的页面用 ?scenario=ok 直接进入某个场景（原型内跳转，不是产品逻辑；
+      // 不用 #hash，因为 proto.js 把当前主题写进 location.hash）。非法 id 保持默认场景。
+      window.addEventListener("DOMContentLoaded", function () {
+        var id = new URLSearchParams(window.location.search).get("scenario");
+        var known = (window.PROTO_SCENARIOS || []).some(function (item) {
+          return item.id === id;
+        });
+        if (known) {
+          Proto.scenario(id);
+        }
+      });
+    </script>
+  </body>
+</html>

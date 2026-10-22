@@ -36,7 +36,7 @@
 - `result-view` 快照 500 行、2 MiB，只是"创建草稿"入口；保存前必须用 `queryData` 重新验证。
 - 浮窗：同插件+workbench 只有**一个**窗口，不是每份报表一个；首版不做 dock。
 - `host.storage`：**256 KiB/值、1 MiB 总量、1024 键、无 CAS**；不是资产库，只存偏好/有限草稿。
-- `saveFile`：单次 ≤512 MiB，每次弹对话框，取消返回 `null`，**无读取回 API**；web 端是下载。
+- `saveFile`：单次 ≤512 MiB，每次弹对话框，取消返回 `null`，**不返回路径、不能写回原文件**；打开经 `fileTransfer.pick` + 分块 `read`（无 manifest 权限，句柄上限 64，桥二进制 ≤8 MiB/块，文档上限 5 MiB），拖入为增强；句柄必须 `finally closeFileHandle`；web 端 `saveFile` 是下载。
 - 无资产 API、无版本事务、无调度/通知 API。
 - 打开文档大小 ≤5 MiB、JSON 深度 ≤64、单字段字符串 ≤1 MiB；严格 `JSON.parse` + schema 校验；拒绝 `__proto__`/原型污染构造。
 
@@ -45,7 +45,7 @@
 - 结果只与 `(connectionId, queryHash, generation)` 绑定；错代响应不得写入状态（`architecture.md:77-85`）。
 - `truncated=true`：可标"样本/已截断"、可预览；**不可**计算"总计/占比"并宣称完整，不可导出全量。
 - 每张卡显示独立取数时间；部分失败标"部分成功"，不用单一"数据截至"时间（产品不变量 7）。
-- CSV 导出：带时间/查询版本/范围；对 `=`、`+`、`-`、`@` 开头单元格做公式注入转义；UTF-8/BOM 正确；只导出当前已验证结果。
+- 不做导出：首版无 CSV/文件导出入口（ADR-10）。若后续重启导出，必须：只导当前已取回样本；UTF-8 **BOM**、全字段引号；对 `=`、`+`、`-`、`@`、TAB、CR 开头单元格前置 `'`（纯数字豁免）；确认框显示截断与逐卡取数时间；文件名标注行数与样本/完整。
 - 精度：decimal 用字符串/定点传输，禁止 JS number 精度丢失后显示"精确"。
 
 ## 5. AI（F + 约束）
@@ -64,7 +64,7 @@
 ## 7. 错误模型（I，`architecture.md:95-115`）
 
 - 统一 `AppError { code, message, detail?, retryable }`；文案分"用户可修复 / 需管理员 / 需升级宿主"。
-- code：`HOST_API_UNSUPPORTED`、`PLUGIN_PERMISSION_DENIED`、`DATA_ACCESS_NOT_GRANTED`、`CONNECTION_NOT_OPEN`、`CONNECTION_UNSUPPORTED`、`SQL_REJECTED`、`QUERY_TIMEOUT`、`QUERY_TRUNCATED`、`RESULT_TOO_LARGE`、`SCHEMA_MISMATCH`、`FORMAT_VERSION_UNSUPPORTED`、`SAVE_CANCELLED`、`STORAGE_QUOTA`、`AI_UNAVAILABLE`/`AI_REFUSED`。
+- code：`HOST_API_UNSUPPORTED`、`PLUGIN_PERMISSION_DENIED`、`DATA_ACCESS_NOT_GRANTED`、`CONNECTION_NOT_OPEN`、`CONNECTION_UNSUPPORTED`、`SQL_REJECTED`、`QUERY_TIMEOUT`、`QUERY_TRUNCATED`、`RESULT_TOO_LARGE`、`SCHEMA_MISMATCH`、`SCHEMA_DRIFT`、`FORMAT_VERSION_UNSUPPORTED`、`FILE_CANCELED`/`FILE_TOO_LARGE`/`FILE_WRITE_FAILED`/`FILE_UNSUPPORTED`/`FILE_HANDLE_EXHAUSTED`、`DRAFT_SAVE_FAILED`、`BINDING_REQUIRED`/`BINDING_AMBIGUOUS`/`BINDING_MISMATCH`、`ABANDONED`、`STORAGE_QUOTA`、`AI_UNAVAILABLE`/`AI_REFUSED`。
 - 错误里可带 code/耗时/行数/截断标记；**不得**带 SQL 字面量、结果值、连接串、token。
 
 ## 8. 代码必须强制的 9 条不变量（`architecture.md:77-85`）
@@ -74,7 +74,7 @@
 3. `truncated=true` 可预览/标样本，不可计算总计并宣称完整，不可导出全量。
 4. 保存前必须通过 schema 校验；未知 `formatVersion` major 只读/拒绝，不静默迁移。
 5. 文档中不出现凭据、密码、token、完整连接配置；只写连接别名与脱敏元数据。
-6. 报表/看板只引用存在的 datasetVersion；删除被引用对象必须显式确认。
+6. 报表用 `basis:{queryHash,fieldsHash,confirmedAt}` 与数据集比对（只比两个哈希）；basis 不一致标 stale；删除被引用对象必须显式确认。
 7. AI 候选未通过 schema/字段校验不得进入预览；未人工确认不得保存。
 8. 看板刷新无跨查询事务；UI 必须逐卡显示时间，不能给单一"数据截至"时间。
 9. 看板 `layout` 只存 12 列网格坐标：加载校验边界、不重叠、与 `reportRefs` 一一对应；不存像素坐标与渲染结果。

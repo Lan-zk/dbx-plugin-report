@@ -85,14 +85,14 @@
 ### 4.3 校验：Zod 4.6.7（TS-07）
 
 - 一个 schema 同时得到：TS 类型、运行时校验、错误路径；`z.toJSONSchema()` 导出给 `data-model.md`，避免文档与实现两份 schema 漂移。
-- 不做 eval/codegen，兼容 `default-src 'none'`；跨字段与引用完整性（`datasetVersionRef` 存在、id 唯一、字段引用存在）手写校验函数，Zod 只管结构。
+- 不做 eval/codegen，兼容 `default-src 'none'`；跨字段与引用完整性（`report.basis` 与数据集哈希一致、id 唯一、字段引用存在）手写校验函数，Zod 只管结构。
 - 否决：Ajv（运行时 `new Function` 编译，CSP 风险；standalone codegen 增加构建步骤）、Yup/Joi（TS 推断弱）。
 
 ### 4.4 哈希与规范化（TS-08）
 
 - `@noble/hashes` 的 sha256：纯 JS、无 eval、同步可测。
 - 不用 `crypto.subtle`：iframe 是 opaque origin，secure context 判定不确定，`subtle` 可能不可用。
-- canonical JSON：键序稳定、数字格式固定、拒绝 `undefined`；`queryHash = sha256(canonical({ connectionId, sql, params: null, maxRows, dbType }))`，文档 `contentHash` 用同一实现。
+- canonical JSON：键序稳定、数字格式固定、拒绝 `undefined`；`queryHash = sha256(canonical({sql, maxRows, timeoutMs, dialectProfile, sourceAliasId}))`，`fieldsHash = sha256(canonical(有序字段契约))`，文档 `contentHash` 用同一实现。**哈希不掺连接 id**：换机重绑定不得改变口径指纹。
 
 ### 4.5 i18n（TS-14）
 

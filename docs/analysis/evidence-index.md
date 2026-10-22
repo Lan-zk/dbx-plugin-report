@@ -1,7 +1,7 @@
 # 证据索引（E01–E15）
 
 > 基线：DBX `b160d130560f71c5c429be15cec6147f677a4b3a`（0.6.51）。  
-> 路径均相对 DBX 仓库根；从本文件出发的链接写作 `../../../dbx/<path>#Lxx`，指向本机 sibling checkout `E:\File\self\github\dbx`。  
+> 路径均相对 DBX 仓库根；从本文件出发的链接写作 `../../../dbx/<path>#Lxx`，指向与本仓库同级的 sibling checkout `../dbx`。  
 > 行号会漂移；引用前按当前 HEAD 重核。完整证据描述与范围见 [feasibility-report.md](feasibility-report.md) 第 8 节附录 A。
 
 | ID | 证据入口 | 证明内容 |

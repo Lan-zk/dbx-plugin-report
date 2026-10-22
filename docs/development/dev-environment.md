@@ -16,7 +16,7 @@
 DBX 仓库（宿主）与本仓库是 sibling：
 
 ```
-E:\File\self\github\
+<workspace>\
   dbx\          # 宿主源码，基线 b160d130
   dbx-report\   # 本插件仓库（当前只有 docs/）
 ```

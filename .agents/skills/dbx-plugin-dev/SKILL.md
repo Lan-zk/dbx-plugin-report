@@ -5,7 +5,7 @@ description: "开发、调试、打包、验证 DBX 桌面端插件（manifest v
 
 # DBX 插件开发
 
-DBX 插件是跑在 DBX 桌面端沙箱 iframe（UI）与可选原生 sidecar（后端）里的扩展包，以 `.dbxp` 分发。本技能给出可执行的开发流程与硬约束；本仓库（dbx-report）的产品规则在 `.agents/rules/`，上游事实源在本机 sibling 仓库 `E:\File\self\github\dbx`。
+DBX 插件是跑在 DBX 桌面端沙箱 iframe（UI）与可选原生 sidecar（后端）里的扩展包，以 `.dbxp` 分发。本技能给出可执行的开发流程与硬约束；本仓库（dbx-plugin-report）的产品规则在 `.agents/rules/`，上游事实源在与本仓库同级的 sibling 仓库 `../dbx`。
 
 ## 权威顺序（冲突时按此裁决）
 
@@ -19,7 +19,7 @@ DBX 插件是跑在 DBX 桌面端沙箱 iframe（UI）与可选原生 sidecar（
 
 ## 最短可行流程
 
-1. **先读规则**：`.agents/rules/plugin-contract.md`、`data-and-security.md`；做 dbx-report 时再读 `product-scope.md`。
+1. **先读规则**：`.agents/rules/plugin-contract.md`、`data-and-security.md`；做 dbx-plugin-report 时再读 `product-scope.md`。
 2. **脚手架**：`dbx-plugin create <name> --template frontend|svelte|rust|go --yes`（frontend/svelte 是 UI-only，rust/go 带原生 sidecar）。
 3. **写 manifest**：字段与权限按 `references/platform.md`，只申请真实使用的权限；id 发布后不可改。
 4. **dev-host 调试**：`dbx-plugin dev --path . --port 5190`（Node 22+）。只覆盖 Host API 1.0 子集，**没有 queryData/saveFile/getTableMetadata**，数据路径必须真机验证。
@@ -45,4 +45,4 @@ DBX 插件是跑在 DBX 桌面端沙箱 iframe（UI）与可选原生 sidecar（
 - `references/platform.md`：manifest、8 类贡献点、权限、Host API 表、打包/签名、sidecar 协议、兼容策略。
 - `references/workflow.md`：完整命令、dev-host 边界、真机检查点、供应链与契约测试命令、footgun 清单、文档陷阱。
 
-上游源码（本机）：`E:\File\self\github\dbx`（只读参考，不要在这里提交本仓库的改动）。
+上游源码（同级 checkout）：`../dbx`（只读参考，不要在这里提交本仓库的改动）。

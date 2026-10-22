@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="zh-CN" data-dbx-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>dbx-plugin-report 原型 v1 · 索引</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="app.css" />
+    <style>
+      /* 索引页专用（.idx-*），不属于产品界面 */
+      .idx-wrap {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 28px 24px 64px;
+      }
+
+      .idx-hero {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid var(--color-border);
+      }
+
+      .idx-h1 {
+        font-size: 22px;
+        font-weight: 600;
+        line-height: 1.25;
+      }
+
+      .idx-lead {
+        font-size: 13px;
+        color: var(--color-muted-foreground);
+        max-width: 720px;
+      }
+
+      .idx-section {
+        margin-top: 28px;
+      }
+
+      .idx-h2 {
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--color-muted-foreground);
+        margin-bottom: 12px;
+      }
+
+      .idx-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(316px, 1fr));
+        gap: 12px;
+      }
+
+      .idx-tile {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 14px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-lg);
+        background: var(--color-card);
+        transition: border-color 0.12s ease;
+      }
+
+      .idx-tile:hover {
+        border-color: var(--color-ring);
+      }
+
+      .idx-tile h3 {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .idx-tile .idx-file {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--color-muted-foreground);
+      }
+
+      .idx-tile p {
+        margin: 0;
+        font-size: 12px;
+        color: var(--color-muted-foreground);
+      }
+
+      .idx-tile .idx-go {
+        margin-top: auto;
+        padding-top: 4px;
+        font-size: 12px;
+        font-weight: 500;
+      }
+
+      .idx-tile .idx-go a {
+        color: var(--color-info);
+      }
+
+      .idx-tile .idx-go a:hover {
+        text-decoration: underline;
+      }
+
+      .idx-two {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 20px;
+      }
+
+      .idx-list {
+        margin: 0;
+        padding-left: 18px;
+        font-size: 12px;
+        color: var(--color-foreground);
+      }
+
+      .idx-list li {
+        margin-bottom: 6px;
+      }
+
+      .idx-list li .muted {
+        color: var(--color-muted-foreground);
+      }
+
+      .idx-num {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        margin-right: 4px;
+        border-radius: 50%;
+        background: var(--color-background-secondary);
+        border: 1px solid var(--color-border);
+        font-size: 10px;
+        color: var(--color-muted-foreground);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="proto-bar">
+      <span class="proto-brand">原型 v1</span>
+      <span class="proto-page">索引</span>
+      <span class="tiny">静态 HTML，无构建、无网络、无持久化；确认后才会写产品代码</span>
+      <span class="spacer"></span>
+      <button type="button" class="btn btn-ghost btn-sm" data-proto-theme>暗色</button>
+    </div>
+
+    <div class="idx-wrap">
+      <header class="idx-hero">
+        <div class="row">
+          <h1 class="idx-h1">dbx-plugin-report 原型 v1</h1>
+          <span class="badge badge-warn">待确认</span>
+          <span class="badge">不可构建为产品</span>
+        </div>
+        <p class="idx-lead">
+          目的：在写第一行产品代码前，用可点击的静态页确认五件事——页面切分、信息层级、状态语义、文案口径、看板编辑手感。
+          页面里的数据全是假的，行为全是写死的；只有“该显示什么、不该说什么”是认真设计的。
+        </p>
+        <div class="meta-row">
+          <span>token 来源：DBX 宿主注入的 --color-* / --radius-* / --font-*（本地镜像）</span>
+          <span>·</span>
+          <span>技术栈：按 ADR-05，Vue 3.5 + Vite，纯前端单包</span>
+          <span>·</span>
+          <span>走查时长：约 10 分钟</span>
+        </div>
+      </header>
+
+      <section class="idx-section">
+        <h2 class="idx-h2">一、五张页面</h2>
+        <div class="idx-grid">
+          <article class="idx-tile">
+            <div class="row">
+              <h3>工作台 / 文档</h3>
+              <span class="spacer"></span>
+              <span class="badge">M0</span>
+            </div>
+            <span class="idx-file">screens/workbench.html</span>
+            <p>打开的文档、未保存态、另存为、源绑定矩阵。回答“文档是不是资产、保存触点在哪儿”。</p>
+            <div class="row wrap">
+              <span class="chip">空态</span>
+              <span class="chip">已保存</span>
+              <span class="chip">未保存</span>
+              <span class="chip">源绑定</span>
+            </div>
+            <div class="idx-go"><a href="screens/workbench.html">打开 →</a></div>
+          </article>
+
+          <article class="idx-tile">
+            <div class="row">
+              <h3>数据集编辑器</h3>
+              <span class="spacer"></span>
+              <span class="badge">M1</span>
+            </div>
+            <span class="idx-file">screens/dataset.html</span>
+            <p>固定 SQL、运行、样本结果、字段契约、maxRows。回答“作者在这里怎么确认口径”。</p>
+            <div class="row wrap">
+              <span class="chip">未绑定</span>
+              <span class="chip">运行中</span>
+              <span class="chip">成功</span>
+              <span class="chip">截断</span>
+              <span class="chip">失败</span>
+              <span class="chip">契约</span>
+            </div>
+            <div class="idx-go"><a href="screens/dataset.html">打开 →</a></div>
+          </article>
+
+          <article class="idx-tile">
+            <div class="row">
+              <h3>报表设计 / 预览</h3>
+              <span class="spacer"></span>
+              <span class="badge">M1</span>
+            </div>
+            <span class="idx-file">screens/report.html</span>
+            <p>表格与柱状、样本内过滤排序、Top-N、合计行、stale 与边界数据。回答“读者看到的东西到底代表什么”。</p>
+            <div class="row wrap">
+              <span class="chip">设计态</span>
+              <span class="chip">表格</span>
+              <span class="chip">柱状</span>
+              <span class="chip">口径漂移</span>
+              <span class="chip">边界</span>
+            </div>
+            <div class="idx-go"><a href="screens/report.html">打开 →</a></div>
+          </article>
+
+          <article class="idx-tile">
+            <div class="row">
+              <h3>小看板</h3>
+              <span class="spacer"></span>
+              <span class="badge">M2</span>
+            </div>
+            <span class="idx-file">screens/dashboard.html</span>
+            <p>12 列网格、逐卡取数时间、部分失败、编辑模式、过滤器。回答“刷新不是快照”这件事怎么让人看懂。</p>
+            <div class="row wrap">
+              <span class="chip">阅读</span>
+              <span class="chip">刷新中</span>
+              <span class="chip">编辑布局</span>
+              <span class="chip">过滤器</span>
+              <span class="chip">窄容器</span>
+            </div>
+            <div class="idx-go"><a href="screens/dashboard.html">打开 →</a></div>
+          </article>
+
+          <article class="idx-tile">
+            <div class="row">
+              <h3>状态与错误</h3>
+              <span class="spacer"></span>
+              <span class="badge">全集</span>
+            </div>
+            <span class="idx-file">screens/states.html</span>
+            <p>24 个错误码的界面呈现、恢复方式、对话框族、全屏阻断、空态。回答“失败时到底说什么、给什么出口”。</p>
+            <div class="row wrap">
+              <span class="chip">错误码总表</span>
+              <span class="chip">内联错误</span>
+              <span class="chip">对话框</span>
+              <span class="chip">全屏阻断</span>
+              <span class="chip">空态</span>
+            </div>
+            <div class="idx-go"><a href="screens/states.html">打开 →</a></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="idx-section">
+        <div class="idx-two">
+          <div>
+            <h2 class="idx-h2">二、需要你确认的五个点</h2>
+            <ol class="idx-list">
+              <li><span class="strong">保存触点在哪儿</span>：顶部工具条单一“另存为”，每次都是另存为、不写回原文件。<span class="muted">（代价：每次保存要弹框选路径）</span></li>
+              <li><span class="strong">截断怎么说</span>：结果区顶部常驻“这是样本 500/5000”，并禁用总计与占比入口。<span class="muted">（代价：常见问题“为什么总数不对”）</span></li>
+              <li><span class="strong">看板刷新怎么说</span>：不给“截至 10:32”，只给逐卡时间；失败卡保留旧数据并标“旧”。<span class="muted">（代价：页面看起来“脏”）</span></li>
+              <li><span class="strong">看板编辑入口</span>：右上角“编辑布局”切换模式，而不是所有手柄常驻。<span class="muted">（代价：多一次点击）</span></li>
+              <li><span class="strong">过滤器放哪儿</span>：看板顶部一行，只作用于已取回行，并显式标注样本范围。<span class="muted">（代价：不能做真正的服务端过滤）</span></li>
+            </ol>
+          </div>
+          <div>
+            <h2 class="idx-h2">三、统一约定</h2>
+            <ul class="idx-list">
+              <li>颜色、圆角、字体只用宿主 token，不硬编码，<span class="muted">装进 DBX 后视觉不变</span></li>
+              <li>正文 13px / 控件 28px / 表格行 30px，<span class="muted">桌面工具密度</span></li>
+              <li>“完整 / 最新 / 已保存 / 总计”四个词，没有依据就不出现</li>
+              <li>每个失败都要给一个出口：重试、改设置、或明确说“只能这样”</li>
+              <li>页面上所有带虚线橙色边的区域 = 原型说明，不属于产品界面</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="idx-section">
+        <h2 class="idx-h2">四、已知限制</h2>
+        <div class="stack">
+          <div class="alert alert-warn">
+            <span class="alert-icon">!</span>
+            <div class="alert-body">
+              <span class="alert-title">多序列图表在暗色下不够用</span>
+              <span class="muted small">宿主 --color-chart-* 是灰阶（212/115/82/64/38），暗色背景 rgb(19 20 22) 上第 4、5 档几乎看不见。原型只用 chart-3 / chart-2 / chart-1 三档，多序列色板需要在 M1 定稿前单独确认。</span>
+            </div>
+          </div>
+          <div class="alert alert-warn">
+            <span class="alert-icon">!</span>
+            <div class="alert-body">
+              <span class="alert-title">字体不是宿主那套 Geist</span>
+              <span class="muted small">插件 iframe 是 opaque origin、CSP 不允许外链，拿不到宿主字体文件。原型按回退栈（PingFang SC / 微软雅黑）演示；若要一致，需要把字体打进插件包，代价是体积。</span>
+            </div>
+          </div>
+          <div class="alert alert-info">
+            <span class="alert-icon">i</span>
+            <div class="alert-body">
+              <span class="alert-title">这些是原型，不是产品代码</span>
+              <span class="muted small">没有状态管理、没有校验、没有错误处理，按钮多为固定反馈。页面结构与类名按“能演进成 ui/ 组件”来写，但不会直接搬进仓库的 src。</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="idx-section">
+        <div class="meta-row">
+          <span>走查清单与开发计划见：</span>
+          <a class="mono" href="README.md">prototype/README.md</a>
+          <span>·</span>
+          <a class="mono" href="../docs/development/delivery-plan.md">docs/development/delivery-plan.md</a>
+          <span>·</span>
+          <a class="mono" href="../docs/development/prototype.md">docs/development/prototype.md</a>
+        </div>
+      </footer>
+    </div>
+
+    <script src="proto.js"></script>
+    <script>
+      // 索引页没有场景，只要主题按钮
+      if (location.hash === "#dark") {
+        Proto.theme("dark");
+      }
+    </script>
+  </body>
+</html>

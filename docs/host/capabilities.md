@@ -87,7 +87,8 @@ manifest v1 可声明（schema 中出现的类型）：`connection-provider`、`
 |---|---|---|
 | `saveFile` | 无独立 manifest 权限（API 可用即可） | 插件生成字节，桌面每次保存弹对话框；web 下载；取消返回 null；单次保存字节上限 512 MiB；不是报表导出引擎 |
 | `downloadFile` | 无独立权限（视 API） | 带进度下载；与保存类似 |
-| `openFilesystem` / 文件拖入 / 资源读取 | `host.filesystem` | 按 manifest 声明的 FS 根与 asset 路径；拖入受文件数/深度/句柄上限约束 |
+| `fileTransfer`：`pick` / `read` / `beginSave` / `write` / `finish` / `closeFileHandle`，`onDrop` / `onDragState` | 无独立 manifest 权限；用 `capabilities.fileTransfer.{pick,beginSave,read,drop,folderExpansion}` 探测 | 打开/保存本地文件的唯一通道；句柄只在用户原生对话框选择或把文件拖入后产生；读取按 `offset/length` 分块（桥二进制上限 8 MiB/块，建议 1 MiB）；句柄上限 64；`beginSave` 取消返回 `null`；拖入展开上限 2000 文件/8 层并带 `truncated`；web 端 `pick` 退化为浏览器 input、`onDrop` 不触发 |
+| `openFilesystem` / 资源读取 | `host.filesystem` | 仅声明 `filesystem-provider` 的插件需要；按 manifest 声明的 FS 根与 asset 路径；本 BI 不使用 |
 | `storage.get/set/delete` | `host.storage` | 单值 256 KiB、总 1 MiB、1024 键；原子单次写，但**无 CAS、无多键事务**；web 端是 localStorage，不等价 |
 
 ### 3.4 AI
@@ -109,6 +110,8 @@ manifest v1 可声明（schema 中出现的类型）：`connection-provider`、`
 
 静态项（`crates/dbx-plugin-runtime/src/plugins/manifest.rs`）：`host.events`、`host.binary`、`host.workbench`、`host.filesystem`、`host.plans:read`、`host.schema:read`、`host.storage`、`host.ai`、`host.clipboard:read`、`host.data:read`、`host.connections:read`，以及历史兼容别名 `host.connections::read`。动态项：`host.network:https://host[:port]`（仅 https、无路径/查询/片段，最多 8 个）。
 
+`fileTransfer` **不在** manifest 权限白名单内：它的“授权”是用户每次在原生打开/保存对话框或拖入动作上的显式同意（桥源码注释：与 `host.saveFile` 同一信任级别，无 manifest 权限门）。因此“能读文件”不等于“能按路径静默读文件”。
+
 **首版计划请求（I）**：`host.workbench`、`host.data:read`、`host.connections:read`、`host.schema:read`、`host.storage`、`host.ai`（可选）。无业务需要不申请 `network`、`clipboard`、`filesystem`、`binary`；用不到就不要声明。
 
 ## 5. 能力探测与降级规则
@@ -123,6 +126,7 @@ manifest v1 可声明（schema 中出现的类型）：`connection-provider`、`
 - iframe `sandbox="allow-scripts"`、opaque origin；CSP `default-src 'none'`，`connect-src` 仅声明的 https origin；默认无 worker/iframe/form，eval 仅图形引擎可选开启。
 - 权限检查主要在**前端 bridge**（`hasPermission` / `requirePermission`）；后端只对 `host.data:read` 做二次强制校验。未来升级需按此现状评估，不能假设所有权限都有后端硬门。
 - `result-view` 只给 500 行快照，`truncated` 只和 500 比较，不证明源结果完整性。
+- 文件读取只在用户 `pick` 或拖入后发生；插件不能按路径直读、不能静默枚举目录；句柄必须在 `finally` 关闭（上限 64）。
 - sidecar 以当前 OS 用户权限运行，不是 OS 沙箱；引入 sidecar 会显著扩大信任边界与发行成本。
 
 ## 7. 源码锚点
@@ -137,6 +141,7 @@ manifest v1 可声明（schema 中出现的类型）：`connection-provider`、`
 | workbench 复用 | `apps/desktop/src/stores/queryStore.ts:4141` |
 | result-view 500 行快照 | `apps/desktop/src/components/layout/ContentArea.vue:1573` |
 | 连接摘要 | `apps/desktop/src/components/plugins/PluginWorkbenchHost.vue:613` |
+| 文件传输（pick/read/save/drop） | `apps/desktop/src/lib/plugins/pluginHostBridge.ts:527-534`、`:839-843`、`:882-900`、`:932-975`、`:1528-1546`；`apps/desktop/src/components/plugins/PluginWorkbenchHost.vue:227-331`；`docs/content/docs/plugin-development.mdx:601-642` |
 | 存储配额 | `src-tauri/src/commands/plugin_storage.rs:24` |
 | AI 生成限额/确认 | `apps/desktop/src/lib/plugins/pluginAiCompletion.ts:90`、`:115` |
 | Agent 合并插件工具 | `crates/dbx-core/src/ai/agent_loop.rs:334` |

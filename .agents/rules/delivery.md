@@ -5,7 +5,7 @@
 ## 1. 环境与布局
 
 - DBX 桌面端 ≥0.6.51（基线 `b160d130`）；**Node.js 22+**（`dbx-plugin dev` 硬性要求）；npm/pnpm + 全局 `@dbx-app/plugin-cli`。
-- 本机 sibling：`E:\File\self\github\dbx`（宿主，只读参考）、`E:\File\self\github\dbx-report`（本插件）。宿主行号按 DBX 仓库根解析，引用前重核或固定 commit。
+- 同级 sibling：`../dbx`（宿主，只读参考）；本仓库即本插件。宿主行号按 DBX 仓库根解析，引用前重核或固定 commit。
 - SQLite 零配置优先；PostgreSQL 用于 M4 认证；Windows/macOS 均需测路径/换行差异。
 - 仓库当前只有 `README.md` + `docs/`，**没有** `package.json`、插件代码、CI。任何"计划命令"不得当成可执行现状。
 
@@ -34,7 +34,7 @@ dbx-plugin package .                          # dist/<id>-<version>-<target>.dbx
 
 ## 4. 真机检查点（M0 必过）
 
-`window.dbxPlugin` 存在；init 后 `capabilities.dataApi === true`；`listConnections` 只返回脱敏摘要；`queryData` 首次弹授权、拒绝后可恢复；`saveFile` 弹对话框、取消返回 `null` 且界面不显示"已保存"；无 CSP（`Refused to …`）报错、无 postMessage origin 报错、无 `unsafe-eval` 依赖。
+`window.dbxPlugin` 存在；init 后 `capabilities.dataApi === true`；`listConnections` 只返回脱敏摘要；`queryData` 首次弹授权、拒绝后可恢复；`saveFile` 弹对话框、取消返回 `null` 且界面不显示"已保存"；`fileTransfer.pick` 弹原生对话框、`read` 分块可读、取消后 `closeFileHandle` 无泄漏；无 CSP（`Refused to …`）报错、无 postMessage origin 报错、无 `unsafe-eval` 依赖。
 
 ## 5. 宿主契约测试（在 DBX 仓库根）
 

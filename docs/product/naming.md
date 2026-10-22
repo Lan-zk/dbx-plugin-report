@@ -7,7 +7,7 @@
 
 | 项 | 取值 |
 |---|---|
-| 仓库 / npm 包名 | `dbx-report` |
+| 仓库 / npm 包名 | `dbx-plugin-report` |
 | manifest id | `io.dbx.report`（若命名空间不可用，退 `io.github.<user>.report`） |
 | 展示名（en） | `DBX Report` |
 | 展示名（zh-CN） | `DBX 报表` |
@@ -21,7 +21,7 @@
 1. **诚实**：首版是“面向 SQL 作者的报表工具”，不是完整 BI；“report”直接说明产出物。
 2. **可搜索**：插件中心按报表/报告搜索时语义明确；避免 `bi` 带来的自助分析预期。
 3. **可演进**：看板、AI 草稿、更多数据库都可以作为 report 的能力扩展，不需要改 id；展示名可随产品阶段调整。
-4. **与生态一致**：官方目录已有 `io.dbx.files`、`io.dbx.kafka` 等命名，`io.dbx.report` 符合惯例。
+4. **与生态一致**：官方目录已有 `io.dbx.files`、`io.dbx.kafka` 等命名，`io.dbx.report` 符合惯例；插件源码仓库按 `dbx-plugin-<name>` 惯例命名（DBX 文档示例 `https://github.com/example/dbx-plugin-files`），故仓库 / npm 包名取 `dbx-plugin-report`。
 
 ## 备选与取舍
 
@@ -59,3 +59,10 @@
 ```
 
 实际字段以当前 `manifest.schema.json` 为准；上例只表达命名约定，不是可安装包。
+
+## 变更记录
+
+- **2026-10-22**：GitHub 仓库名与 npm 包名由 `dbx-report` 改为 `dbx-plugin-report`，对齐 DBX 生态 `dbx-plugin-*` 仓库惯例；`manifest.id`、展示名、贡献点 id 前缀不变（`io.dbx.report` / `DBX Report` / `DBX 报表`），仓库名与 id 是两套命名（见上）。本机 checkout 目录名仍为 `dbx-report`，文档中的本地路径与脚手架目录参数不改；若本机目录改名，需同步 `docs/README.md:63`、`docs/development/dev-environment.md:21`、`.agents/rules/delivery.md:8` 及脚手架命令。
+  - 备选：保持 `dbx-report`（放弃：与生态仓库命名不一致）；只改 GitHub 仓库名、不同步文档（放弃：文档与仓库两套名字）。
+  - 复议条件：商店命名空间确认要求调整可安装包名/仓库名，或本机目录改名后需同步路径引用。
+

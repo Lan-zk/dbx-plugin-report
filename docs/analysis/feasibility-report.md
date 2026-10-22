@@ -7,6 +7,8 @@
 
 **阅读约定。** F＝代码或一手规范可直接核对的事实；I＝由事实推导的裁决；H＝尚待运行验证的假设。E 为本仓库证据，X 为外部一手来源，V 为验证方案。拟定的对象、限制、验收阈值均是 I，不能当作宿主已有行为。正文不含表格与附录，控制在 6000 字内。
 
+> **2026-10-22 后续修订**：本文是分析时点快照。数据模型已升级 v0.1（`report.basis` 取代 `datasetVersionRef`、`fields[].transport`、看板 ≤20 卡等，见 `docs/development/data-model.md`），打开路径已确认为 `fileTransfer.pick/read`（见 `docs/analysis/reference-pitfalls.md` §3）。字段名与机制以新文档为准。
+
 ## 1）结论摘要
 
 **建议有条件立项为“本机 SQL 报表作者工具”，不承诺完整 BI 平台。** 宿主已经提供安全边界明确但有局限的 UI 桥、SQL 查询和文件保存；没有报表资产、语义编译器、团队发布与协作契约。首版应让懂 SQL 的作者把固定查询变成可重复打开的报表，再组合成小型看板。是否满足真实工作量，要由 V2/V3 的运行验收决定。[E01–E10；V1–V3]
@@ -18,7 +20,7 @@
 | AI 草稿 vs AI 自动发布 | **AI 草稿，人工验证与保存** | 文本生成可用；工具链与发布闭环不是现成 BI 能力。组合 Agent 路线有条件可行，留后续 spike。[E06/E07；V4/V5] |
 | 本机资产 vs 团队共享 | **本机文档资产** | 首版以可导入导出的定义文件为准；云同步不等于 ACL、协作和共享服务。“本机”不意味着永不离机。[E08；V6] |
 
-MVP：桌面、前端插件、单连接文档、手写/AI 辅助固定 SQL、表格/柱线图/数值卡、最多四张报表组成一个看板、手动刷新、JSON 定义和当前结果 CSV 导出。拟认证首批 SQLite/PostgreSQL；未通过真实数据库验收不得对外标“支持”。Dock、浮窗、PNG/SVG、SQL 参数、MCP 草稿写入列后续。首版不需要新增 Host API；若坚持绑定参数、确认取消、任意连接自动化或团队发布，必须另行裁决宿主/服务扩展。
+MVP：桌面、前端插件、单连接文档、手写/AI 辅助固定 SQL、表格/柱线图/数值卡、最多四张报表组成一个看板、手动刷新、JSON 定义（首版不做文件导出，见 ADR-10）。拟认证首批 SQLite/PostgreSQL；未通过真实数据库验收不得对外标“支持”。Dock、浮窗、PNG/SVG、SQL 参数、MCP 草稿写入列后续。首版不需要新增 Host API；若坚持绑定参数、确认取消、任意连接自动化或团队发布，必须另行裁决宿主/服务扩展。
 
 ## 2）宿主能力 → BI 需求矩阵
 
@@ -250,7 +252,7 @@ cargo test -p dbx-mcp plugin_tools
 
 ## 8）附录：证据、一手来源、竞品拆解
 
-> 副本说明：本文件位于 `dbx-report/docs/analysis/`。文中证据链接写作 `../../../dbx/<path>#Lxx`，从本文件出发指向 sibling checkout `E:\File\self\github\dbx`。若在独立仓库或网页阅读，请按 DBX 仓库根解析，或改用 `https://github.com/t8y2/dbx/blob/b160d130560f71c5c429be15cec6147f677a4b3a/<path>`。
+> 副本说明：本文件位于本仓库 `docs/analysis/`（GitHub 仓库 `dbx-plugin-report`；本机 checkout 目录为 `dbx-report`）。文中证据链接写作 `../../../dbx/<path>#Lxx`，从本文件出发指向与本仓库同级的 sibling checkout（相对本文件）。若在独立仓库或网页阅读，请按 DBX 仓库根解析，或改用 `https://github.com/t8y2/dbx/blob/b160d130560f71c5c429be15cec6147f677a4b3a/<path>`。
 
 ### A. DBX 仓库 file:line 证据索引（相对路径）
 

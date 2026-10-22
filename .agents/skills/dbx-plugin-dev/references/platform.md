@@ -62,7 +62,8 @@
 | `sendBinary(channel, data)` | `host.binary` | UI 单向 8 MiB/条，超出分块 |
 | `readAsset`/`readAssetUrl` | — | 单个资源 ≤32 MiB |
 | `openWorkbench`/`setTitle`/`getTitle`/`executeCommand` | `host.workbench` | 每个贡献点一个实例；tab/panel 两种呈现 |
-| `openFilesystem` | `host.filesystem` | dev-host 未实现 → 报错 |
+| `openFilesystem` | `host.filesystem` | dev-host 未实现 → 报错；只属 filesystem-provider，报表打开不用它 |
+| `fileTransfer.pick/read/beginSave/write/finish/closeFileHandle`、`onDrop`/`onDragState` | — | **无 manifest 权限**：pick/beginSave 由原生对话框触发，drop 由 OS 拖入触发；读块 ≤8 MiB、句柄上限 64、drop 展开 ≤2000 文件/8 层；web 端 pick=input、beginSave=下载；dev-host 未实现，须真机验证 |
 | `getPlanCapabilities`/`explainPlan` | `host.plans:read` | Host API 1.2；`maxPlanBytes` 4 MiB、`maxTimeoutMs` 60000；插件不提供 SQL |
 | `getTableMetadata` | `host.schema:read` | Host API 1.3；字段仅 `name,dataType,nullable,length,precision,scale,default`；只对已知表；可能返回 `unknown` |
 | `queryData` | `host.data:read` | Host API 1.4；一次只读语句；每（插件,连接）授权；上限见 `data-and-security.md` |
@@ -72,7 +73,7 @@
 | `ai.listModels` | `host.ai` + `capabilities.aiCompletion` | 只返回 `{configId,name,model,isDefault}` |
 | `ai.generateText` | `host.ai` + `capabilities.aiCompletion` | prompt ≤100000 字符、返回 ≤16000 字符、同一 workbench 单飞、逐次确认 |
 | `ai.setRecommendations`/`clearRecommendations` | `host.ai` | ≤5 条可见、不持久化 |
-| `capabilities` | — | `{downloadFile,planApi,schemaMetadataApi,dataApi,connectionsApi,storage,ai,aiModelDiscovery,aiCompletion,aiRecommendations}`；调用前先门控 |
+| `capabilities` | — | `{downloadFile,planApi,schemaMetadataApi,dataApi,connectionsApi,storage,ai,aiModelDiscovery,aiCompletion,aiRecommendations,fileTransfer:{pick,beginSave,read,drop,folderExpansion}}`；调用前先门控 |
 | `host.requestUserInput`（sidecar→host） | Host API 1.1 | prompt ≤2000、title ≤200、default ≤1000、options ≤8×200、timeoutSecs 5–600（默认 300）、**最多 4 个同时打开**，错误码 `-32001`/`-32602`/`-32601` |
 
 能力探测规则：声明 `engines.host_api` 下限，同时运行时读 `capabilities`/`host.features`；缺 `dataApi` 禁止刷新并提示升级；缺 `aiCompletion` 保留完整手工流程；未知能力一律视为不支持；不要用 try/catch 探测代替能力声明；版本号相同不代表能力相同（desktop/web 有差异）。

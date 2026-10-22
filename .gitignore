@@ -7,6 +7,9 @@ coverage/
 # 临时工作区（调研底稿等保留在本地）
 .tmp/
 
+# 原型截图与无头浏览器临时 profile（本地验证用，不进版本库）
+prototype/.shots/
+
 # 编辑器与系统文件
 .DS_Store
 Thumbs.db

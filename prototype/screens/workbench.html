@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="zh-CN" data-dbx-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>工作台 / 文档 · dbx-plugin-report 原型 v1</title>
+    <link rel="stylesheet" href="../tokens.css" />
+    <link rel="stylesheet" href="../app.css" />
+    <style>
+      /* 本页专用布局类（.wb-*）：app.css 没有对应组件时在这里补，不进产品共享样式 */
+      .wb-side-scroll {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+      }
+
+      /* 文档结构是"名称 + 摘要"两行项，比 .list-item 默认的 32px 单行略高 */
+      .wb-doc-list .list-item {
+        align-items: flex-start;
+      }
+
+      .wb-doc-list .list-item .primary {
+        font-weight: 500;
+      }
+
+      .wb-doc-list .list-item .secondary {
+        margin-top: 1px;
+      }
+
+      .wb-content-scroll {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: auto;
+        padding: var(--gap-5);
+      }
+
+      .wb-col {
+        display: flex;
+        flex-direction: column;
+        gap: var(--gap-5);
+      }
+
+      .wb-src {
+        display: flex;
+        align-items: center;
+        gap: var(--gap-3);
+        padding: 7px 0;
+        border-bottom: 1px solid var(--color-border-light);
+      }
+
+      .wb-src:last-child {
+        border-bottom: 0;
+        padding-bottom: 0;
+      }
+
+      .wb-src:first-child {
+        padding-top: 0;
+      }
+
+      .wb-empty-actions {
+        display: flex;
+        gap: var(--gap-3);
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+
+      /* 源绑定矩阵：固定列宽，说明列允许换行，避免在 1280 宽下横向滚动 */
+      .wb-bind-table {
+        table-layout: fixed;
+      }
+
+      .wb-bind-table .c-alias {
+        width: 200px;
+      }
+
+      .wb-bind-table .c-status {
+        width: 92px;
+      }
+
+      .wb-bind-table .c-conn {
+        width: 300px;
+      }
+
+      .wb-bind-table td.desc {
+        white-space: normal;
+      }
+
+      .wb-bind-table .select {
+        width: 230px;
+      }
+
+      .wb-bind-foot {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        gap: var(--gap-4);
+        padding: var(--gap-4) var(--gap-5);
+        border-top: 1px solid var(--color-border);
+      }
+
+      .wb-bind-foot .alert {
+        flex: 1 1 auto;
+      }
+
+      /* 本次改动列表 */
+      .wb-change-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .wb-change-list li {
+        display: flex;
+        align-items: center;
+        gap: var(--gap-3);
+        padding: 6px 0;
+        border-bottom: 1px solid var(--color-border-light);
+        font-size: var(--fs-12);
+      }
+
+      .wb-change-list li:last-child {
+        border-bottom: 0;
+        padding-bottom: 0;
+      }
+
+      .wb-change-list .delta {
+        font-family: var(--font-mono);
+        font-size: var(--fs-11);
+        color: var(--color-muted-foreground);
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 原型工具条：场景切换 / 主题 / 返回索引（真机删除） -->
+    <div class="proto-bar">
+      <span class="proto-brand">原型 v1</span>
+      <span class="proto-page">工作台</span>
+      <div class="seg" data-proto-scenarios></div>
+      <span id="proto-scenario-caption" class="tiny"></span>
+      <span class="spacer"></span>
+      <button type="button" class="btn btn-ghost btn-sm" data-proto-theme>暗色</button>
+      <a class="btn btn-ghost btn-sm" href="../index.html">索引</a>
+    </div>
+
+    <!-- 场景 1：空态 —— 没有打开任何文档（顶栏刻意没有标题：宿主不返回路径，没有文件名可显示） -->
+    <section class="scenario" data-scenario="empty">
+      <div class="topbar">
+        <span class="spacer"></span>
+        <button type="button" class="btn" disabled>另存为…</button>
+      </div>
+      <div class="main">
+        <div class="content">
+          <div class="empty">
+            <div class="empty-art" aria-hidden="true">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M6 3h8l4 4v14H6z"></path>
+                <path d="M14 3v4h4"></path>
+              </svg>
+            </div>
+            <div class="empty-title">还没有打开文档</div>
+            <p class="empty-desc">本工具不保存副本，文档就是你本机的 JSON 文件。</p>
+            <div class="wb-empty-actions">
+              <button type="button" class="btn btn-primary btn-lg" data-goto-scenario="loaded">
+                打开文件…
+              </button>
+              <button type="button" class="btn btn-lg">从连接新建…</button>
+            </div>
+            <p class="tiny muted">也可以把 .json 文件拖进窗口</p>
+            <span class="ann">不做「最近打开」：宿主不返回文件路径，无法按路径静默重读</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 场景 2：已保存 —— 有打开文档、内容与文件一致 -->
+    <section class="scenario" data-scenario="loaded">
+      <div class="topbar">
+        <span class="title">零售经营周报.dbxreport.json</span>
+        <span class="badge badge-ok">已另存为 10:24</span>
+        <span class="spacer"></span>
+        <span class="ann">保存＝「另存为…」：每次弹宿主文件框，不回写原文件</span>
+        <button type="button" class="btn btn-primary">另存为…</button>
+        <button type="button" class="btn">打开…</button>
+      </div>
+      <div class="main">
+        <!-- 左栏：文档结构（数据集 / 报表 / 看板） -->
+        <aside class="sidebar">
+          <div class="pane-head">
+            文档结构
+            <span class="spacer"></span>
+            <span class="tiny muted">6 项</span>
+          </div>
+          <div class="wb-side-scroll">
+            <div class="section">
+              <div class="section-title">数据集 <span class="tiny">2</span></div>
+              <div class="list wb-doc-list">
+                <div class="list-item" aria-selected="true">
+                  <span class="dot dot-ok"></span>
+                  <div class="grow">
+                    <div class="primary">周销售明细（区域×渠道）</div>
+                    <div class="secondary">5 列 · 口径 10-21 18:12</div>
+                  </div>
+                </div>
+                <div class="list-item">
+                  <span class="dot dot-warn"></span>
+                  <div class="grow">
+                    <div class="primary">履约日报</div>
+                    <div class="secondary">7 列 · 口径未确认</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="section">
+              <div class="section-title">报表 <span class="tiny">3</span></div>
+              <div class="list wb-doc-list">
+                <div class="list-item">
+                  <div class="grow">
+                    <div class="primary">各区成交额</div>
+                    <div class="secondary">柱状 · Top 6 · 引用 周销售明细</div>
+                  </div>
+                </div>
+                <div class="list-item">
+                  <div class="grow">
+                    <div class="primary">渠道订单结构</div>
+                    <div class="secondary">表格 · 引用 周销售明细</div>
+                  </div>
+                </div>
+                <div class="list-item">
+                  <div class="grow">
+                    <div class="primary">区域履约时效</div>
+                    <div class="secondary">表格 · 引用 履约日报</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="section">
+              <div class="section-title">看板 <span class="tiny">1</span></div>
+              <div class="list wb-doc-list">
+                <div class="list-item">
+                  <div class="grow">
+                    <div class="primary">零售经营周报</div>
+                    <div class="secondary">6 张卡 · 打开时不自动刷新</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <!-- 右栏：源绑定摘要 + 文档信息 -->
+        <div class="content">
+          <div class="pane-head">
+            文档概览
+            <span class="spacer"></span>
+            <span class="ann">文档结构来自文件内容；tab 标题不是资产库</span>
+          </div>
+          <div class="wb-content-scroll">
+            <div class="wb-col">
+              <div class="panel">
+                <div class="panel-head">
+                  源绑定
+                  <span class="spacer"></span>
+                  <button type="button" class="btn btn-ghost btn-sm" data-goto-scenario="binding">
+                    管理绑定…
+                  </button>
+                </div>
+                <div class="panel-body">
+                  <div class="wb-src">
+                    <span class="dot dot-ok"></span>
+                    <div class="grow">
+                      <div class="strong">销售库（只读）</div>
+                      <div class="tiny muted">
+                        <span class="mono">src_sales</span> → <span class="mono">pg-sales-prod</span>
+                      </div>
+                    </div>
+                    <span class="badge badge-ok">已绑定</span>
+                  </div>
+                  <div class="wb-src">
+                    <span class="dot dot-idle"></span>
+                    <div class="grow">
+                      <div class="strong">履约库（只读）</div>
+                      <div class="tiny muted"><span class="mono">src_ops</span> · 未绑定</div>
+                    </div>
+                    <button type="button" class="btn btn-sm" data-goto-scenario="binding">绑定…</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="panel">
+                <div class="panel-head">文档信息</div>
+                <div class="panel-body">
+                  <dl class="kv">
+                    <dt>formatVersion</dt>
+                    <dd class="mono">0.1</dd>
+                    <dt>revision</dt>
+                    <dd class="mono">18</dd>
+                    <dt>时区</dt>
+                    <dd>Asia/Shanghai</dd>
+                    <dt>另存于</dt>
+                    <dd>10:24</dd>
+                  </dl>
+                </div>
+              </div>
+
+              <div class="alert alert-info">
+                <span class="alert-icon">i</span>
+                <div class="alert-body">
+                  <span>插件只读写你选中的文件，不保存任何副本。</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 场景 3：未保存 —— 有内存改动，文件还没更新 -->
+    <section class="scenario" data-scenario="dirty">
+      <div class="topbar">
+        <span class="dot dot-warn"></span>
+        <span class="title">零售经营周报.dbxreport.json</span>
+        <span class="small">未保存的更改</span>
+        <span class="spacer"></span>
+        <button type="button" class="btn btn-primary">另存为…</button>
+        <button type="button" class="btn">打开…</button>
+      </div>
+      <div class="main">
+        <!-- 左栏：同上文档结构，改动过的条目带 warn 点 -->
+        <aside class="sidebar">
+          <div class="pane-head">
+            文档结构
+            <span class="spacer"></span>
+            <span class="badge badge-warn">有改动</span>
+          </div>
+          <div class="wb-side-scroll">
+            <div class="section">
+              <div class="section-title">数据集 <span class="tiny">2</span></div>
+              <div class="list wb-doc-list">
+                <div class="list-item" aria-selected="true">
+                  <span class="dot dot-warn"></span>
+                  <div class="grow">
+                    <div class="primary">周销售明细（区域×渠道）</div>
+                    <div class="secondary">maxRows 已改 · 待另存</div>
+                  </div>
+                </div>
+                <div class="list-item">
+                  <span class="dot dot-warn"></span>
+                  <div class="grow">
+                    <div class="primary">履约日报</div>
+                    <div class="secondary">7 列 · 口径未确认</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="section">
+              <div class="section-title">报表 <span class="tiny">3</span></div>
+              <div class="list wb-doc-list">
+                <div class="list-item">
+                  <span class="dot dot-warn"></span>
+                  <div class="grow">
+                    <div class="primary">各区成交额</div>
+                    <div class="secondary">显示上限已改 · 待另存</div>
+                  </div>
+                </div>
+                <div class="list-item">
+                  <div class="grow">
+                    <div class="primary">渠道订单结构</div>
+                    <div class="secondary">表格 · 引用 周销售明细</div>
+                  </div>
+                </div>
+                <div class="list-item">
+                  <div class="grow">
+                    <div class="primary">区域履约时效</div>
+                    <div class="secondary">表格 · 引用 履约日报</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="section">
+              <div class="section-title">看板 <span class="tiny">1</span></div>
+              <div class="list wb-doc-list">
+                <div class="list-item">
+                  <span class="dot dot-warn"></span>
+                  <div class="grow">
+                    <div class="primary">零售经营周报</div>
+                    <div class="secondary">新增 1 张卡 · 待另存</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <!-- 右栏：本次改动清单 + 丢弃入口 -->
+        <div class="content">
+          <div class="pane-head">未保存的更改</div>
+          <div class="wb-content-scroll">
+            <div class="wb-col">
+              <div class="panel">
+                <div class="panel-head">
+                  本次改动
+                  <span class="badge badge-warn">3 项</span>
+                  <span class="spacer"></span>
+                  <span class="tiny muted">只在内存里，文件仍是 10:24 那版</span>
+                </div>
+                <div class="panel-body">
+                  <ul class="wb-change-list">
+                    <li>
+                      <span class="dot dot-warn"></span>
+                      <span class="grow">数据集「周销售明细」maxRows</span>
+                      <span class="delta">500 → 2000</span>
+                    </li>
+                    <li>
+                      <span class="dot dot-warn"></span>
+                      <span class="grow">报表「各区成交额」显示上限</span>
+                      <span class="delta">8 类 → 6 类</span>
+                    </li>
+                    <li>
+                      <span class="dot dot-warn"></span>
+                      <span class="grow">看板「零售经营周报」卡片数</span>
+                      <span class="delta">6 → 7 张</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="alert alert-warn">
+                <span class="alert-icon">!</span>
+                <div class="alert-body">
+                  <span class="alert-title">关闭标签页不会自动保存</span>
+                  <span class="muted small">
+                    这些改动只在内存里。要保留就点「另存为…」，写到你在文件框里选的位置。
+                  </span>
+                </div>
+              </div>
+
+              <div class="row">
+                <span class="tiny muted">丢弃后回到 10:24 另存的版本，无法撤销。</span>
+                <span class="spacer"></span>
+                <button type="button" class="btn btn-danger">丢弃更改</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 场景 4：源绑定 —— 源别名 → 本机连接的绑定矩阵 -->
+    <section class="scenario" data-scenario="binding">
+      <div class="topbar">
+        <span class="title">源绑定</span>
+        <span class="crumb">零售经营周报.dbxreport.json</span>
+        <span class="spacer"></span>
+        <span class="ann">只绑定连接 id；凭据由 DBX 管理，插件从不读取</span>
+        <button type="button" class="btn" data-goto-scenario="loaded">返回文档</button>
+      </div>
+      <div class="main">
+        <div class="content">
+          <div class="pane-head">
+            源别名 5 个
+            <span class="spacer"></span>
+            <span class="tiny muted">必需 2 · 可选 3 · 不做跨连接 JOIN</span>
+          </div>
+
+          <div class="table-wrap">
+            <table class="table wb-bind-table">
+              <colgroup>
+                <col class="c-alias" />
+                <col class="c-status" />
+                <col class="c-conn" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>源别名</th>
+                  <th>状态</th>
+                  <th>当前连接</th>
+                  <th>说明与动作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- 已绑定：显示上次取数时间，可改绑 -->
+                <tr>
+                  <td><span class="mono">src_sales</span> <span class="tiny muted">销售库 · 必需</span></td>
+                  <td><span class="badge badge-ok">已绑定</span></td>
+                  <td>
+                    <span class="row">
+                      <span class="dot dot-ok"></span>
+                      <span class="mono">pg-sales-prod</span>
+                      <span class="tiny muted">库 sales</span>
+                    </span>
+                  </td>
+                  <td class="desc">
+                    <span class="row">
+                      <span class="tiny muted">上次取数成功 10:23:58</span>
+                      <span class="spacer"></span>
+                      <button type="button" class="btn btn-sm btn-ghost">改绑…</button>
+                    </span>
+                  </td>
+                </tr>
+
+                <!-- 未绑定：必需源为空，运行会被阻断 -->
+                <tr>
+                  <td><span class="mono">src_ops</span> <span class="tiny muted">履约库 · 必需</span></td>
+                  <td><span class="badge badge-warn">未绑定</span></td>
+                  <td><span class="null">未选择</span></td>
+                  <td class="desc">
+                    <span class="row">
+                      <span class="code-pill">BINDING_REQUIRED</span>
+                      <span class="tiny muted">运行会被阻断</span>
+                      <span class="spacer"></span>
+                      <button type="button" class="btn btn-sm btn-primary">绑定…</button>
+                    </span>
+                  </td>
+                </tr>
+
+                <!-- 有歧义：两个同名连接，必须指定库名 -->
+                <tr>
+                  <td><span class="mono">src_member</span> <span class="tiny muted">会员库 · 可选</span></td>
+                  <td><span class="badge badge-warn">有歧义</span></td>
+                  <td>
+                    <select class="select">
+                      <option>pg-sales-prod · 库 sales</option>
+                      <option>pg-sales-prod · 库 sales_archive</option>
+                    </select>
+                  </td>
+                  <td class="desc">
+                    <span class="row">
+                      <span class="code-pill">BINDING_AMBIGUOUS</span>
+                      <span class="tiny muted">同名连接 2 个</span>
+                      <span class="spacer"></span>
+                      <button type="button" class="btn btn-sm">指定</button>
+                    </span>
+                  </td>
+                </tr>
+
+                <!-- 连接已关闭：需要先在 DBX 里打开连接 -->
+                <tr>
+                  <td><span class="mono">src_region</span> <span class="tiny muted">区域维表 · 可选</span></td>
+                  <td><span class="badge badge-err">连接已关闭</span></td>
+                  <td>
+                    <span class="row">
+                      <span class="mono">sqlite-local</span>
+                      <span class="tiny muted">SQLite</span>
+                    </span>
+                  </td>
+                  <td class="desc">
+                    <span class="row">
+                      <span class="code-pill">CONNECTION_NOT_OPEN</span>
+                      <span class="tiny muted">在 DBX 里打开连接后重试</span>
+                      <span class="spacer"></span>
+                      <button type="button" class="btn btn-sm">重试</button>
+                    </span>
+                  </td>
+                </tr>
+
+                <!-- 未授权：权限 ≠ 授权，动作是重新授权 -->
+                <tr>
+                  <td><span class="mono">src_coupon</span> <span class="tiny muted">营销库 · 可选</span></td>
+                  <td><span class="badge badge-err">未授权</span></td>
+                  <td>
+                    <span class="row">
+                      <span class="mono">pg-sales-prod</span>
+                      <span class="tiny muted">库 sales</span>
+                    </span>
+                  </td>
+                  <td class="desc">
+                    <span class="row">
+                      <span class="code-pill">DATA_ACCESS_NOT_GRANTED</span>
+                      <span class="tiny muted">授权被拒绝，本次不再弹</span>
+                      <span class="spacer"></span>
+                      <button type="button" class="btn btn-sm">重新授权</button>
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="wb-bind-foot">
+            <div class="alert alert-warn">
+              <span class="alert-icon">!</span>
+              <div class="alert-body">
+                <span class="alert-title">必需源未绑定，运行会被阻断</span>
+                <span class="muted small">
+                  <span class="mono">src_ops</span> 还没有绑定连接。绑定后保存，数据集才能取数；可选源可以留空。
+                </span>
+              </div>
+            </div>
+            <button type="button" class="btn btn-primary">保存绑定</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <script src="../proto.js"></script>
+    <script src="../mock.js"></script>
+    <script>
+      // 场景顺序即原型工具条里的按钮顺序；第一个是默认场景
+      window.PROTO_SCENARIOS = [
+        { id: "empty", label: "空态" },
+        { id: "loaded", label: "已保存" },
+        { id: "dirty", label: "未保存" },
+        { id: "binding", label: "源绑定" }
+      ];
+
+      // 原型内跳转：元素上写 data-goto-scenario，点击即切到对应场景（不是产品逻辑）
+      document.querySelectorAll("[data-goto-scenario]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          Proto.scenario(btn.dataset.gotoScenario);
+        });
+      });
+
+      // 支持从别的页面用 ?scenario=loaded 直接进入某个场景（原型内跳转，不是产品逻辑；
+      // 不用 #hash，因为 proto.js 把当前主题写进 location.hash）。非法 id 保持默认场景。
+      window.addEventListener("DOMContentLoaded", function () {
+        var id = new URLSearchParams(window.location.search).get("scenario");
+        var known = (window.PROTO_SCENARIOS || []).some(function (item) {
+          return item.id === id;
+        });
+        if (known) {
+          Proto.scenario(id);
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,1020 @@
+<!doctype html>
+<html lang="zh-CN" data-dbx-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>dbx-plugin-report 原型 · 小看板</title>
+    <link rel="stylesheet" href="../tokens.css" />
+    <link rel="stylesheet" href="../app.css" />
+    <style>
+      /* 页级样式（.db-*）：app.css 没有、只在看板原型页使用。颜色全部来自 --color-* / --radius-*。 */
+      .db-strip {
+        display: flex;
+        align-items: center;
+        gap: var(--gap-4);
+        flex: 0 0 auto;
+        height: 26px;
+        padding: 0 12px;
+        border-bottom: 1px solid var(--color-border);
+        background: var(--color-background-secondary);
+        font-size: var(--fs-11);
+        color: color-mix(in srgb, var(--color-muted-foreground) 82%, var(--color-foreground));
+      }
+
+      .db-filters {
+        display: flex;
+        align-items: center;
+        gap: var(--gap-3);
+        flex: 0 0 auto;
+        padding: 6px 12px;
+        border-bottom: 1px solid var(--color-border);
+      }
+
+      /* .chip 原本是展示用 span；看板过滤器把它做成可点的按钮 */
+      .db-filters button.chip {
+        height: 22px;
+        background: var(--color-background);
+        cursor: pointer;
+      }
+
+      .db-filters button.chip:hover {
+        border-color: var(--color-ring);
+      }
+
+      /* 看板网格：撑满 .main（或 .content）剩余高度，不靠卡内容撑开 */
+      .db-dash {
+        flex: 1 1 auto;
+        height: auto;
+        min-height: 0;
+      }
+
+      .db-pad {
+        padding: var(--gap-4);
+      }
+
+      /* 卡片内说明行（截断、Top-N 等） */
+      .db-note {
+        flex: 0 0 auto;
+        padding: 6px 10px;
+        border-top: 1px solid var(--color-border-light);
+        font-size: var(--fs-11);
+        color: var(--color-muted-foreground);
+        line-height: 1.5;
+      }
+
+      .db-footnote {
+        flex: 0 0 auto;
+        padding: 6px 12px;
+        border-top: 1px solid var(--color-border);
+        font-size: var(--fs-11);
+        color: var(--color-muted-foreground);
+      }
+
+      /* 刷新工具条：进度 + 计数 + 停止等待 */
+      .db-banner {
+        display: flex;
+        flex-direction: column;
+        gap: var(--gap-2);
+        flex: 0 0 auto;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--color-border);
+        background: var(--color-background-secondary);
+      }
+
+      /* 刷新中/排队中：旧数据保持可读但明显是“旧的” */
+      .db-dim {
+        opacity: 0.5;
+      }
+
+      /* 编辑布局：卡片头部的尺寸菜单会超出卡片边界 */
+      .db-menu-open {
+        position: relative;
+        z-index: 20;
+        overflow: visible;
+      }
+
+      /* 编辑布局下面内容只做占位，表示“位置/尺寸在改，内容不变” */
+      .db-placeholder {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        font-size: var(--fs-11);
+        color: color-mix(in srgb, var(--color-muted-foreground) 82%, var(--color-foreground));
+        text-align: center;
+      }
+
+      /* 过滤器场景左栏 */
+      .db-side {
+        flex: 0 0 320px;
+      }
+
+      /* 窄容器场景：520px 的窄 tab 预览框 */
+      .db-narrow-wrap {
+        width: 520px;
+        max-width: 100%;
+        height: 100%;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        border-left: 1px solid var(--color-border);
+        border-right: 1px solid var(--color-border);
+        background: var(--color-background);
+      }
+
+      .db-narrow {
+        display: flex;
+        flex-direction: column;
+        flex: 1 1 auto;
+        min-height: 0;
+      }
+
+      /* 窄容器下看板塌成单列：不横向滚动 */
+      .db-narrow .dash {
+        grid-template-columns: 1fr;
+      }
+    </style>
+  </head>
+  <body data-page="看板">
+    <!-- 原型工具条：场景切换 / 主题 / 返回索引，不属于产品界面 -->
+    <div class="proto-bar">
+      <span class="proto-brand">原型 v1</span>
+      <span class="proto-page">看板</span>
+      <div class="seg" data-proto-scenarios></div>
+      <span id="proto-scenario-caption" class="tiny"></span>
+      <span class="spacer"></span>
+      <button type="button" class="btn btn-ghost btn-sm" data-proto-theme>暗色</button>
+      <a class="btn btn-ghost btn-sm" href="../index.html">索引</a>
+    </div>
+
+    <!-- 场景 1：阅读态 —— 顶部过滤器 + 6 张卡（部分失败、部分截断） -->
+    <section class="scenario" data-scenario="read">
+      <div class="topbar">
+        <span class="title">零售经营周报</span>
+        <span class="badge badge-outline">看板</span>
+        <span class="badge">6 张卡</span>
+        <span class="spacer"></span>
+        <button type="button" class="btn btn-sm" data-proto-toast="刷新全部：逐卡排队取数（原型示意）">刷新全部</button>
+        <button type="button" class="btn btn-sm" data-proto-toast="切换到编辑布局（原型示意）">编辑布局</button>
+        <div class="pop-anchor">
+          <button
+            type="button"
+            class="icon-btn"
+            aria-label="更多操作"
+            aria-haspopup="menu"
+            data-proto-toast="溢出菜单入口（原型示意）"
+          >
+            ⋯
+          </button>
+        </div>
+      </div>
+      <div class="db-strip">
+        <span>各卡独立取数，时间可能不同；本页不代表统一快照</span>
+        <span class="spacer"></span>
+        <span>打开时自动刷新：关闭</span>
+      </div>
+      <div class="db-filters">
+        <button type="button" class="chip" data-proto-toast="区域筛选（原型示意）">区域：全部 <span class="tiny">▾</span></button>
+        <button type="button" class="chip" data-proto-toast="渠道筛选（原型示意）">渠道：全部 <span class="tiny">▾</span></button>
+        <button type="button" class="chip" data-proto-toast="日期范围（原型示意）">日期：本周 <span class="tiny">▾</span></button>
+        <span class="spacer"></span>
+        <span class="tiny muted">筛选只作用于各卡已取回行</span>
+      </div>
+      <div class="main">
+        <div class="dash db-dash">
+          <!-- 卡 1：表格卡 -->
+          <article class="card" style="grid-column: span 4; grid-row: span 8">
+            <div class="card-head">
+              <span class="dot dot-ok"></span>
+              <span class="ellipsis">区域×渠道明细</span>
+              <span class="spacer"></span>
+              <span class="badge badge-outline">表格</span>
+              <span class="badge">样本 8 行</span>
+            </div>
+            <div class="table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>区域</th>
+                    <th>渠道</th>
+                    <th class="num">成交额（元）</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>华东</td><td>天猫</td><td class="num mono">1,289,345.67</td></tr>
+                  <tr><td>华南</td><td>抖音</td><td class="num mono">742,180.44</td></tr>
+                  <tr><td>华东</td><td>京东</td><td class="num mono">986,220.10</td></tr>
+                  <tr><td>华北</td><td>天猫</td><td class="num mono">701,332.09</td></tr>
+                  <tr><td>华中</td><td>抖音</td><td class="num mono">310,770.23</td></tr>
+                  <tr><td>西南</td><td>京东</td><td class="num mono">288,140.55</td></tr>
+                  <tr><td>东北</td><td>天猫</td><td class="num mono">141,206.80</td></tr>
+                  <tr><td>西北</td><td class="null">NULL</td><td class="num mono">48,213.05</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="card-foot">
+              <span>样本 8/8</span>
+              <span class="spacer"></span>
+              <span>取数 10:32:18</span>
+            </div>
+          </article>
+
+          <!-- 卡 2：排行卡（hbars） -->
+          <article class="card" style="grid-column: span 4; grid-row: span 8">
+            <div class="card-head">
+              <span class="dot dot-ok"></span>
+              <span class="ellipsis">渠道成交额排行</span>
+              <span class="spacer"></span>
+              <span class="badge">4 类</span>
+            </div>
+            <div class="card-body">
+              <div class="hbars">
+                <div class="hbar">
+                  <span class="hbar-label">天猫</span>
+                  <span class="hbar-track"><i style="--w: 100%"></i></span>
+                  <span class="hbar-value">213.2万</span>
+                </div>
+                <div class="hbar">
+                  <span class="hbar-label">京东</span>
+                  <span class="hbar-track"><i style="--w: 60%"></i></span>
+                  <span class="hbar-value">127.4万</span>
+                </div>
+                <div class="hbar">
+                  <span class="hbar-label">抖音</span>
+                  <span class="hbar-track"><i style="--w: 49%"></i></span>
+                  <span class="hbar-value">105.3万</span>
+                </div>
+                <div class="hbar">
+                  <span class="hbar-label">未标注</span>
+                  <span class="hbar-track"><i style="--w: 3%"></i></span>
+                  <span class="hbar-value">4.8万</span>
+                </div>
+              </div>
+              <p class="tiny muted" style="margin-top: 10px">按 gmv 降序；未合并「其他」桶，空渠道单列为「未标注」。</p>
+            </div>
+            <div class="card-foot">
+              <span>取数 10:32:19</span>
+              <span class="spacer"></span>
+              <span>单位：万元</span>
+            </div>
+          </article>
+
+          <!-- 卡 3：柱状卡（第 2 行左半，显式行起点保证两行排布） -->
+          <article class="card" style="grid-column: span 6; grid-row: 9 / span 6">
+            <div class="card-head">
+              <span class="dot dot-ok"></span>
+              <span class="ellipsis">区域成交额</span>
+              <span class="spacer"></span>
+              <span class="badge badge-outline">柱状</span>
+              <span class="badge">7 类</span>
+            </div>
+            <div class="card-body">
+              <div class="chart">
+                <div class="bars">
+                  <div class="bar-col"><span class="bar-val">227.6万</span><div class="bar" style="--h: 88%"></div></div>
+                  <div class="bar-col"><span class="bar-val">74.2万</span><div class="bar" style="--h: 29%"></div></div>
+                  <div class="bar-col"><span class="bar-val">70.1万</span><div class="bar" style="--h: 27%"></div></div>
+                  <div class="bar-col"><span class="bar-val">31.1万</span><div class="bar" style="--h: 12%"></div></div>
+                  <div class="bar-col"><span class="bar-val">28.8万</span><div class="bar" style="--h: 11%"></div></div>
+                  <div class="bar-col"><span class="bar-val">14.1万</span><div class="bar" style="--h: 6%"></div></div>
+                  <div class="bar-col"><span class="bar-val">4.8万</span><div class="bar" style="--h: 3%"></div></div>
+                </div>
+                <div class="axis-x">
+                  <span>华东</span>
+                  <span>华南</span>
+                  <span>华北</span>
+                  <span>华中</span>
+                  <span>西南</span>
+                  <span>东北</span>
+                  <span>西北</span>
+                </div>
+              </div>
+            </div>
+            <div class="card-foot">
+              <span>取数 10:32:21</span>
+              <span class="spacer"></span>
+              <span>未截断</span>
+            </div>
+          </article>
+
+          <!-- 卡 4：数值卡 -->
+          <article class="card" style="grid-column: span 4; grid-row: span 3">
+            <div class="card-head">
+              <span class="dot dot-ok"></span>
+              <span class="ellipsis">本周成交额</span>
+              <span class="spacer"></span>
+              <span class="badge badge-outline">数值</span>
+            </div>
+            <div class="card-body">
+              <div class="kpi">
+                <div class="value">¥4,507,408.93</div>
+                <div class="caption">来自 SQL 合计标记行（is_total = 1）</div>
+              </div>
+            </div>
+            <div class="card-foot">
+              <span>取数 10:32:22</span>
+              <span class="spacer"></span>
+              <span>SQL 标记行</span>
+            </div>
+          </article>
+
+          <!-- 卡 5：失败卡（保留旧数据，不是空白） -->
+          <article class="card card-err card-stale" style="grid-column: span 4; grid-row: span 5">
+            <div class="card-head">
+              <span class="dot dot-err"></span>
+              <span class="ellipsis">客单价（上次成功）</span>
+              <span class="spacer"></span>
+              <span class="badge badge-err">QUERY_TIMEOUT</span>
+              <span class="badge badge-warn">旧 · 09:58</span>
+            </div>
+            <div class="db-pad">
+              <div class="alert alert-err">
+                <span class="alert-icon">!</span>
+                <div class="alert-body">
+                  <span class="alert-title">本次取数失败</span>
+                  <span class="small">达到 timeoutMs 上限（60 s），服务端可能仍在执行。</span>
+                </div>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="kpi">
+                <div class="value">¥809.05</div>
+                <div class="caption">旧数据 · 09:58 取数</div>
+              </div>
+            </div>
+            <div class="card-foot">
+              <span>旧 · 09:58 · 本次取数失败</span>
+              <span class="spacer"></span>
+              <button type="button" class="btn btn-ghost btn-sm" data-proto-toast="打开该卡对应的报表（原型示意）">打开报表</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-proto-toast="重试该卡（原型示意）">重试</button>
+            </div>
+          </article>
+
+          <!-- 卡 6：截断卡（样本 500/500，不提供总计/占比入口） -->
+          <article class="card" style="grid-column: span 6; grid-row: 9 / span 6">
+            <div class="card-head">
+              <span class="dot dot-warn"></span>
+              <span class="ellipsis">明细样本</span>
+              <span class="spacer"></span>
+              <span class="badge badge-warn">样本 500/500</span>
+            </div>
+            <div class="table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>区域</th>
+                    <th>渠道</th>
+                    <th class="num">成交额（元）</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>华东</td><td>天猫</td><td class="num mono">1,289,345.67</td></tr>
+                  <tr><td>华南</td><td>抖音</td><td class="num mono">742,180.44</td></tr>
+                  <tr><td>华东</td><td>京东</td><td class="num mono">986,220.10</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="db-note">只取回前 500 行，样本之外的行未知；总计与占比不可用。</div>
+            <div class="card-foot">
+              <span>样本 500/500 · 已截断</span>
+              <span class="spacer"></span>
+              <span>取数 10:32:23</span>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 场景 2：刷新中 —— 逐卡状态 + 停止等待 -->
+    <section class="scenario" data-scenario="refresh" hidden>
+      <div class="topbar">
+        <span class="title">零售经营周报</span>
+        <span class="badge badge-outline">看板</span>
+        <span class="badge badge-info">刷新中</span>
+        <span class="spacer"></span>
+        <span class="tiny muted">刷新全部会逐卡排队，不并发打满</span>
+      </div>
+      <div class="db-banner">
+        <div class="row">
+          <div class="progress grow"><i style="width: 50%"></i></div>
+          <span class="tiny nowrap">正在刷新 3/6 · 已用 4.1 s</span>
+          <button
+            type="button"
+            class="btn btn-sm"
+            data-proto-toast="已停止等待：已发出的请求会被丢弃，数据库可能仍在执行（原型示意）"
+          >
+            停止等待
+          </button>
+        </div>
+        <span class="tiny muted">停止只是停止等待：已发出的请求会被丢弃，数据库可能仍在执行。</span>
+      </div>
+      <div class="main">
+        <div class="dash db-dash">
+          <!-- 已完成的卡：照常显示本次结果 -->
+          <article class="card" style="grid-column: span 4; grid-row: span 8">
+            <div class="card-head">
+              <span class="dot dot-ok"></span>
+              <span class="ellipsis">区域×渠道明细</span>
+              <span class="spacer"></span>
+              <span class="badge badge-ok">已刷新</span>
+            </div>
+            <div class="table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>区域</th>
+                    <th>渠道</th>
+                    <th class="num">成交额（元）</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>华东</td><td>天猫</td><td class="num mono">1,289,345.67</td></tr>
+                  <tr><td>华南</td><td>抖音</td><td class="num mono">742,180.44</td></tr>
+                  <tr><td>华东</td><td>京东</td><td class="num mono">986,220.10</td></tr>
+                  <tr><td>华北</td><td>天猫</td><td class="num mono">701,332.09</td></tr>
+                  <tr><td>华中</td><td>抖音</td><td class="num mono">310,770.23</td></tr>
+                  <tr><td>西南</td><td>京东</td><td class="num mono">288,140.55</td></tr>
+                  <tr><td>东北</td><td>天猫</td><td class="num mono">141,206.80</td></tr>
+                  <tr><td>西北</td><td class="null">NULL</td><td class="num mono">48,213.05</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="card-foot">
+              <span>样本 8/8</span>
+              <span class="spacer"></span>
+              <span>取数 10:32:18</span>
+            </div>
+          </article>
+
+          <article class="card" style="grid-column: span 4; grid-row: span 8">
+            <div class="card-head">
+              <span class="dot dot-ok"></span>
+              <span class="ellipsis">渠道成交额排行</span>
+              <span class="spacer"></span>
+              <span class="badge badge-ok">已刷新</span>
+            </div>
+            <div class="card-body">
+              <div class="hbars">
+                <div class="hbar">
+                  <span class="hbar-label">天猫</span>
+                  <span class="hbar-track"><i style="--w: 100%"></i></span>
+                  <span class="hbar-value">213.2万</span>
+                </div>
+                <div class="hbar">
+                  <span class="hbar-label">京东</span>
+                  <span class="hbar-track"><i style="--w: 60%"></i></span>
+                  <span class="hbar-value">127.4万</span>
+                </div>
+                <div class="hbar">
+                  <span class="hbar-label">抖音</span>
+                  <span class="hbar-track"><i style="--w: 49%"></i></span>
+                  <span class="hbar-value">105.3万</span>
+                </div>
+                <div class="hbar">
+                  <span class="hbar-label">未标注</span>
+                  <span class="hbar-track"><i style="--w: 3%"></i></span>
+                  <span class="hbar-value">4.8万</span>
+                </div>
+              </div>
+            </div>
+            <div class="card-foot">
+              <span>取数 10:32:19</span>
+              <span class="spacer"></span>
+              <span>单位：万元</span>
+            </div>
+          </article>
+
+          <!-- 取数中：旧数据留下但明显变淡，本卡自己的等待时间；第 2 行左半 -->
+          <article class="card" style="grid-column: span 6; grid-row: 9 / span 6">
+            <div class="card-head">
+              <span class="dot dot-warn"></span>
+              <span class="ellipsis">区域成交额</span>
+              <span class="spacer"></span>
+              <span class="badge badge-info">取数中</span>
+            </div>
+            <div class="card-body">
+              <div class="row" style="margin-bottom: 6px">
+                <span class="tiny">取数中…</span>
+                <span class="spacer"></span>
+                <span class="tiny muted">已等待 2.1 s</span>
+              </div>
+              <div class="progress"><i style="width: 62%"></i></div>
+              <div class="db-dim" style="margin-top: 10px">
+                <div class="chart" style="height: 120px">
+                  <div class="bars">
+                    <div class="bar-col"><span class="bar-val">227.6万</span><div class="bar" style="--h: 88%"></div></div>
+                    <div class="bar-col"><span class="bar-val">74.2万</span><div class="bar" style="--h: 29%"></div></div>
+                    <div class="bar-col"><span class="bar-val">70.1万</span><div class="bar" style="--h: 27%"></div></div>
+                    <div class="bar-col"><span class="bar-val">31.1万</span><div class="bar" style="--h: 12%"></div></div>
+                    <div class="bar-col"><span class="bar-val">28.8万</span><div class="bar" style="--h: 11%"></div></div>
+                    <div class="bar-col"><span class="bar-val">14.1万</span><div class="bar" style="--h: 6%"></div></div>
+                    <div class="bar-col"><span class="bar-val">4.8万</span><div class="bar" style="--h: 3%"></div></div>
+                  </div>
+                  <div class="axis-x">
+                    <span>华东</span>
+                    <span>华南</span>
+                    <span>华北</span>
+                    <span>华中</span>
+                    <span>西南</span>
+                    <span>东北</span>
+                    <span>西北</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="card-foot">
+              <span>上次成功：09:58</span>
+              <span class="spacer"></span>
+              <span>本卡独立计时</span>
+            </div>
+          </article>
+
+          <!-- 已放弃等待：只有“重试”，没有“取消” -->
+          <article class="card card-stale" style="grid-column: span 4; grid-row: span 3">
+            <div class="card-head">
+              <span class="dot dot-warn"></span>
+              <span class="ellipsis">本周成交额</span>
+              <span class="spacer"></span>
+              <span class="badge badge-warn">已放弃等待</span>
+            </div>
+            <div class="card-body">
+              <div class="kpi">
+                <div class="value">¥4,507,408.93</div>
+                <div class="caption">旧数据 · 响应已丢弃</div>
+              </div>
+            </div>
+            <div class="card-foot">
+              <span>数据库可能仍在执行</span>
+              <span class="spacer"></span>
+              <button type="button" class="btn btn-ghost btn-sm" data-proto-toast="打开该卡对应的报表（原型示意）">打开报表</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-proto-toast="重试该卡（原型示意）">重试</button>
+            </div>
+          </article>
+
+          <!-- 未映射到失败的卡：排队中，显示队列位次 -->
+          <article class="card card-stale" style="grid-column: span 4; grid-row: span 5">
+            <div class="card-head">
+              <span class="dot dot-idle"></span>
+              <span class="ellipsis">客单价</span>
+              <span class="spacer"></span>
+              <span class="badge">排队中 · 第 5</span>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <span class="tiny">等待轮到自己取数</span>
+                <span class="spacer"></span>
+                <span class="tiny muted">插件内队列最多 2 个在途</span>
+              </div>
+              <div class="kpi" style="margin-top: 8px">
+                <div class="value">¥809.05</div>
+                <div class="caption">上次成功 09:58 的数据</div>
+              </div>
+            </div>
+            <div class="card-foot">
+              <span>等待轮到自己取数</span>
+            </div>
+          </article>
+
+          <article class="card card-stale" style="grid-column: span 6; grid-row: 9 / span 6">
+            <div class="card-head">
+              <span class="dot dot-idle"></span>
+              <span class="ellipsis">明细样本</span>
+              <span class="spacer"></span>
+              <span class="badge">排队中 · 第 6</span>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <span class="tiny">等待轮到自己取数</span>
+                <span class="spacer"></span>
+                <span class="tiny muted">未发出请求</span>
+              </div>
+              <div class="table-wrap db-dim" style="margin-top: 8px; min-height: 0">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>区域</th>
+                      <th>渠道</th>
+                      <th class="num">成交额（元）</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td>华东</td><td>天猫</td><td class="num mono">1,289,345.67</td></tr>
+                    <tr><td>华南</td><td>抖音</td><td class="num mono">742,180.44</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="card-foot">
+              <span>样本 500/500（上次）</span>
+              <span class="spacer"></span>
+              <span>上次取数 10:31:02</span>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 场景 3：编辑布局 —— 12 列网格线、拖动手柄、尺寸菜单 -->
+    <section class="scenario" data-scenario="edit" hidden>
+      <div class="topbar">
+        <span class="title">零售经营周报</span>
+        <span class="badge badge-outline">看板</span>
+        <span class="badge badge-primary">编辑布局</span>
+        <span class="spacer"></span>
+        <span class="badge">6/20 张卡 · 建议 ≤12</span>
+        <button type="button" class="btn btn-ghost btn-sm" data-proto-toast="撤销上一次布局改动（原型示意）">撤销</button>
+        <button type="button" class="btn btn-sm" data-proto-toast="紧凑排列：向上吸附，不留空行（原型示意）">紧凑排列</button>
+        <button type="button" class="btn btn-primary btn-sm" data-proto-toast="退出编辑布局（原型示意）" data-proto-toast-kind="ok">
+          完成
+        </button>
+      </div>
+      <div class="db-strip">
+        <span>12 列网格吸附，拖动不会重叠；最小卡片 2×3</span>
+        <span class="spacer"></span>
+        <span>布局改动不触发取数</span>
+      </div>
+      <div class="main">
+        <div class="dash is-editing db-dash">
+          <article class="card" style="grid-column: span 4; grid-row: span 8">
+            <div class="card-head">
+              <span class="drag-handle" aria-hidden="true">⠿</span>
+              <span class="ellipsis">区域×渠道明细</span>
+              <span class="spacer"></span>
+              <button type="button" class="btn btn-ghost btn-sm">4×8 <span class="caret">▾</span></button>
+            </div>
+            <div class="card-body">
+              <div class="db-placeholder">表格 · 区域×渠道明细</div>
+            </div>
+          </article>
+
+          <article class="card" style="grid-column: span 4; grid-row: span 8">
+            <div class="card-head">
+              <span class="drag-handle" aria-hidden="true">⠿</span>
+              <span class="ellipsis">渠道成交额排行</span>
+              <span class="spacer"></span>
+              <button type="button" class="btn btn-ghost btn-sm">4×8 <span class="caret">▾</span></button>
+            </div>
+            <div class="card-body">
+              <div class="db-placeholder">横向排行 · 渠道成交额</div>
+            </div>
+          </article>
+
+          <!-- 这一张的尺寸菜单展开；第 2 行左半 -->
+          <article class="card db-menu-open" style="grid-column: span 6; grid-row: 9 / span 6">
+            <div class="card-head">
+              <span class="drag-handle" aria-hidden="true">⠿</span>
+              <span class="ellipsis">区域成交额</span>
+              <span class="spacer"></span>
+              <div class="pop-anchor">
+                <button type="button" class="btn btn-ghost btn-sm" aria-haspopup="menu" aria-expanded="true">
+                  6×6 <span class="caret">▾</span>
+                </button>
+                <div class="menu" role="menu">
+                  <div class="menu-title">尺寸（宽 × 高，格）</div>
+                  <button type="button" role="menuitem">2 × 3</button>
+                  <button type="button" role="menuitem">3 × 3</button>
+                  <button type="button" role="menuitem">4 × 3</button>
+                  <button type="button" role="menuitem">6 × 3</button>
+                  <div class="sep"></div>
+                  <div class="menu-title">最小 2 × 3</div>
+                </div>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="db-placeholder">柱状 · 区域成交额</div>
+            </div>
+          </article>
+
+          <article class="card" style="grid-column: span 4; grid-row: span 3">
+            <div class="card-head">
+              <span class="drag-handle" aria-hidden="true">⠿</span>
+              <span class="ellipsis">本周成交额</span>
+              <span class="spacer"></span>
+              <button type="button" class="btn btn-ghost btn-sm">4×3 <span class="caret">▾</span></button>
+            </div>
+            <div class="card-body">
+              <div class="db-placeholder">数值 · 本周成交额</div>
+            </div>
+          </article>
+
+          <article class="card" style="grid-column: span 4; grid-row: span 5">
+            <div class="card-head">
+              <span class="drag-handle" aria-hidden="true">⠿</span>
+              <span class="ellipsis">客单价（上次成功）</span>
+              <span class="spacer"></span>
+              <button type="button" class="btn btn-ghost btn-sm">4×5 <span class="caret">▾</span></button>
+            </div>
+            <div class="card-body">
+              <div class="db-placeholder">数值 · 客单价</div>
+            </div>
+          </article>
+
+          <article class="card" style="grid-column: span 6; grid-row: 9 / span 6">
+            <div class="card-head">
+              <span class="drag-handle" aria-hidden="true">⠿</span>
+              <span class="ellipsis">明细样本</span>
+              <span class="spacer"></span>
+              <button type="button" class="btn btn-ghost btn-sm">6×6 <span class="caret">▾</span></button>
+            </div>
+            <div class="card-body">
+              <div class="db-placeholder">表格 · 明细样本（样本 500/500）</div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 场景 4：过滤器 —— 左栏筛选配置 + 右侧看板预览 + 未映射警告 -->
+    <section class="scenario" data-scenario="filters" hidden>
+      <div class="topbar">
+        <span class="title">零售经营周报</span>
+        <span class="badge badge-outline">看板</span>
+        <span class="badge badge-primary">筛选设置</span>
+        <span class="spacer"></span>
+        <span class="badge badge-warn">1 项必填未填</span>
+        <button type="button" class="btn btn-ghost btn-sm" data-proto-toast="保存筛选配置（原型示意）">保存筛选</button>
+        <button type="button" class="btn btn-primary btn-sm" data-proto-toast="完成筛选设置（原型示意）" data-proto-toast-kind="ok">
+          完成
+        </button>
+      </div>
+      <div class="main">
+        <!-- 筛选配置栏 -->
+        <aside class="sidebar db-side">
+          <div class="pane-head">
+            <span class="strong">筛选配置</span>
+            <span class="spacer"></span>
+            <span class="badge">3 个筛选</span>
+          </div>
+          <div class="pane-body stack-5">
+            <div class="field">
+              <label for="db-f-region">区域 *</label>
+              <select id="db-f-region" class="select">
+                <option value="" selected>请选择区域</option>
+                <option>华东</option>
+                <option>华南</option>
+                <option>华北</option>
+                <option>华中</option>
+                <option>西南</option>
+                <option>东北</option>
+                <option>西北</option>
+              </select>
+              <span class="hint">必填：未选值时相关卡片显示“未应用筛选”，不默认全选。</span>
+            </div>
+
+            <div class="field">
+              <span class="label">渠道 *</span>
+              <label class="check"><input type="checkbox" checked />天猫</label>
+              <label class="check"><input type="checkbox" />京东</label>
+              <label class="check"><input type="checkbox" />抖音</label>
+              <span class="hint">多选；候选项来自已取回结果去重，仅代表样本里出现过的值。</span>
+            </div>
+
+            <div class="field">
+              <label for="db-f-date">日期范围 *</label>
+              <select id="db-f-date" class="select">
+                <option selected>本周（10-19 至 10-25）</option>
+                <option>上周</option>
+                <option>本月</option>
+                <option>自定义…</option>
+              </select>
+              <span class="hint">预设只映射到卡片字段，不改写 SQL；跨时区以数据库时区为准。</span>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="field">
+              <span class="label">映射状态</span>
+              <div class="row wrap">
+                <span class="badge badge-ok">4 张已映射</span>
+                <span class="badge badge-warn">2 张未映射</span>
+              </div>
+              <span class="hint">未映射的卡不受该筛选影响，卡片右上角会标出。</span>
+            </div>
+          </div>
+        </aside>
+
+        <!-- 看板预览 -->
+        <div class="content">
+          <div class="pane-head">
+            <span class="strong">看板预览</span>
+            <span class="badge badge-outline">3 张缩略卡</span>
+            <span class="spacer"></span>
+            <span class="tiny muted">配置改动只影响预览，不重新取数</span>
+          </div>
+          <div class="db-pad">
+            <div class="alert alert-warn">
+              <span class="alert-icon">!</span>
+              <div class="alert-body">
+                <span class="alert-title">「渠道」在 2 张卡中未映射</span>
+                <span class="small">这 2 张卡不受渠道筛选影响，仍显示各自取回的样本；补齐映射或接受该行为。</span>
+              </div>
+            </div>
+          </div>
+          <div class="dash db-dash">
+            <article class="card" style="grid-column: span 6; grid-row: span 6">
+              <div class="card-head">
+                <span class="dot dot-warn"></span>
+                <span class="ellipsis">区域成交额</span>
+                <span class="spacer"></span>
+                <span class="badge badge-warn">未应用筛选</span>
+              </div>
+              <div class="card-body">
+                <div class="chart">
+                  <div class="bars">
+                    <div class="bar-col"><span class="bar-val">227.6万</span><div class="bar" style="--h: 88%"></div></div>
+                    <div class="bar-col"><span class="bar-val">74.2万</span><div class="bar" style="--h: 29%"></div></div>
+                    <div class="bar-col"><span class="bar-val">70.1万</span><div class="bar" style="--h: 27%"></div></div>
+                    <div class="bar-col"><span class="bar-val">31.1万</span><div class="bar" style="--h: 12%"></div></div>
+                    <div class="bar-col"><span class="bar-val">28.8万</span><div class="bar" style="--h: 11%"></div></div>
+                    <div class="bar-col"><span class="bar-val">14.1万</span><div class="bar" style="--h: 6%"></div></div>
+                    <div class="bar-col"><span class="bar-val">4.8万</span><div class="bar" style="--h: 3%"></div></div>
+                  </div>
+                  <div class="axis-x">
+                    <span>华东</span>
+                    <span>华南</span>
+                    <span>华北</span>
+                    <span>华中</span>
+                    <span>西南</span>
+                    <span>东北</span>
+                    <span>西北</span>
+                  </div>
+                </div>
+              </div>
+              <div class="card-foot"><span>映射字段：region · 未选值，暂不生效</span></div>
+            </article>
+
+            <article class="card" style="grid-column: span 6; grid-row: span 6">
+              <div class="card-head">
+                <span class="dot dot-warn"></span>
+                <span class="ellipsis">渠道成交额排行</span>
+                <span class="spacer"></span>
+                <span class="badge badge-warn">未映射渠道</span>
+              </div>
+              <div class="card-body">
+                <div class="hbars">
+                  <div class="hbar">
+                    <span class="hbar-label">天猫</span>
+                    <span class="hbar-track"><i style="--w: 100%"></i></span>
+                    <span class="hbar-value">213.2万</span>
+                  </div>
+                  <div class="hbar">
+                    <span class="hbar-label">京东</span>
+                    <span class="hbar-track"><i style="--w: 60%"></i></span>
+                    <span class="hbar-value">127.4万</span>
+                  </div>
+                  <div class="hbar">
+                    <span class="hbar-label">抖音</span>
+                    <span class="hbar-track"><i style="--w: 49%"></i></span>
+                    <span class="hbar-value">105.3万</span>
+                  </div>
+                  <div class="hbar">
+                    <span class="hbar-label">未标注</span>
+                    <span class="hbar-track"><i style="--w: 3%"></i></span>
+                    <span class="hbar-value">4.8万</span>
+                  </div>
+                </div>
+              </div>
+              <div class="card-foot"><span>不受「渠道」筛选影响</span></div>
+            </article>
+
+            <article class="card" style="grid-column: span 12; grid-row: span 3">
+              <div class="card-head">
+                <span class="dot dot-warn"></span>
+                <span class="ellipsis">本周成交额</span>
+                <span class="spacer"></span>
+                <span class="badge badge-warn">未映射渠道</span>
+              </div>
+              <div class="card-body">
+                <div class="kpi">
+                  <div class="value">¥4,507,408.93</div>
+                  <div class="caption">来自 SQL 合计标记行（is_total = 1）；不受渠道筛选影响</div>
+                </div>
+              </div>
+            </article>
+          </div>
+          <div class="db-footnote">筛选只作用于已取回行，不改变 SQL。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 场景 5：窄容器 —— 520px 单列，不横向滚动 -->
+    <section class="scenario" data-scenario="narrow" hidden>
+      <div class="topbar">
+        <span class="title">零售经营周报</span>
+        <span class="badge badge-outline">看板</span>
+        <span class="badge">窄容器</span>
+        <span class="spacer"></span>
+        <span class="tiny muted">拖到窄 tab 时的排布</span>
+      </div>
+      <div class="main">
+        <div class="db-narrow-wrap">
+          <div class="pane-head">
+            <span class="strong">窄 tab 预览</span>
+            <span class="badge badge-outline">容器宽 520 px</span>
+            <span class="spacer"></span>
+            <span class="badge">单列</span>
+          </div>
+          <div class="db-narrow">
+            <div class="dash">
+              <article class="card" style="grid-row: span 4">
+                <div class="card-head">
+                  <span class="dot dot-ok"></span>
+                  <span class="ellipsis">本周成交额</span>
+                  <span class="spacer"></span>
+                  <span class="badge badge-outline">数值</span>
+                </div>
+                <div class="card-body">
+                  <div class="kpi">
+                    <div class="value">¥4,507,408.93</div>
+                    <div class="caption">来自 SQL 合计标记行（is_total = 1）</div>
+                  </div>
+                </div>
+                <div class="card-foot"><span>取数 10:32:22</span></div>
+              </article>
+
+              <article class="card" style="grid-row: span 4">
+                <div class="card-head">
+                  <span class="dot dot-ok"></span>
+                  <span class="ellipsis">区域成交额</span>
+                  <span class="spacer"></span>
+                  <span class="badge badge-outline">柱状</span>
+                </div>
+                <div class="card-body">
+                  <div class="chart">
+                    <div class="bars">
+                      <div class="bar-col"><span class="bar-val">227.6万</span><div class="bar" style="--h: 88%"></div></div>
+                      <div class="bar-col"><span class="bar-val">74.2万</span><div class="bar" style="--h: 29%"></div></div>
+                      <div class="bar-col"><span class="bar-val">70.1万</span><div class="bar" style="--h: 27%"></div></div>
+                      <div class="bar-col"><span class="bar-val">31.1万</span><div class="bar" style="--h: 12%"></div></div>
+                      <div class="bar-col"><span class="bar-val">28.8万</span><div class="bar" style="--h: 11%"></div></div>
+                      <div class="bar-col"><span class="bar-val">14.1万</span><div class="bar" style="--h: 6%"></div></div>
+                      <div class="bar-col"><span class="bar-val">4.8万</span><div class="bar" style="--h: 3%"></div></div>
+                    </div>
+                    <div class="axis-x">
+                      <span>华东</span>
+                      <span>华南</span>
+                      <span>华北</span>
+                      <span>华中</span>
+                      <span>西南</span>
+                      <span>东北</span>
+                      <span>西北</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="card-foot"><span>取数 10:32:21</span></div>
+              </article>
+
+              <article class="card" style="grid-row: span 5">
+                <div class="card-head">
+                  <span class="dot dot-ok"></span>
+                  <span class="ellipsis">渠道成交额排行</span>
+                  <span class="spacer"></span>
+                  <span class="badge">4 类</span>
+                </div>
+                <div class="card-body">
+                  <div class="hbars">
+                    <div class="hbar">
+                      <span class="hbar-label">天猫</span>
+                      <span class="hbar-track"><i style="--w: 100%"></i></span>
+                      <span class="hbar-value">213.2万</span>
+                    </div>
+                    <div class="hbar">
+                      <span class="hbar-label">京东</span>
+                      <span class="hbar-track"><i style="--w: 60%"></i></span>
+                      <span class="hbar-value">127.4万</span>
+                    </div>
+                    <div class="hbar">
+                      <span class="hbar-label">抖音</span>
+                      <span class="hbar-track"><i style="--w: 49%"></i></span>
+                      <span class="hbar-value">105.3万</span>
+                    </div>
+                    <div class="hbar">
+                      <span class="hbar-label">未标注</span>
+                      <span class="hbar-track"><i style="--w: 3%"></i></span>
+                      <span class="hbar-value">4.8万</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="card-foot"><span>取数 10:32:19</span></div>
+              </article>
+            </div>
+          </div>
+          <div class="db-footnote">窄 tab 下按单列排布，不横向滚动。</div>
+        </div>
+      </div>
+    </section>
+
+    <script src="../proto.js"></script>
+    <script src="../mock.js"></script>
+    <script>
+      window.PROTO_SCENARIOS = [
+        { id: "read", label: "阅读" },
+        { id: "refresh", label: "刷新中" },
+        { id: "edit", label: "编辑布局" },
+        { id: "filters", label: "过滤器" },
+        { id: "narrow", label: "窄容器" }
+      ];
+    </script>
+  </body>
+</html>

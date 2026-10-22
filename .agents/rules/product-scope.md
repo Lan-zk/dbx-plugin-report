@@ -83,16 +83,16 @@
 
 ## 7. 命名（建议方案，待商店确认，`naming.md:10-17`）
 
-仓库/npm 包 `dbx-report`；manifest id `io.dbx.report`（不可用则退 `io.github.<user>.report`）；展示名 en `DBX Report` / zh-CN `DBX 报表`；贡献点 id 前缀 `io.dbx.report.`；版本起点 `0.1.0`。manifest id 发布后**不可改**；`io.dbx.report` 未向 `t8y2/dbx-store` 确认（`naming.md:40`）。
+仓库/npm 包 `dbx-plugin-report`；manifest id `io.dbx.report`（不可用则退 `io.github.<user>.report`）；展示名 en `DBX Report` / zh-CN `DBX 报表`；贡献点 id 前缀 `io.dbx.report.`；版本起点 `0.1.0`。manifest id 发布后**不可改**；`io.dbx.report` 未向 `t8y2/dbx-store` 确认（`naming.md:40`）。
 
 ## 8. 状态标注与文档矛盾（实现者不得默认成立）
 
 - 报告/分析中的对象、阈值、验收标准是**拟定**，不是宿主已有行为；不得写成产品现状（`docs/README.md:61`）。
 - 已知矛盾（需在对应文档修正，不在代码里二选一）：
   1. 155 项宿主契约测试：`feasibility-report.md:199,227` 写"本轮实际执行通过"，`assessment.md:37` 写"本轮未重跑"——引用时必须带"2026-10-22 实测"或重跑。
-  2. 首切片字段名 `connectionAlias`（`first-slice.md:57`）与冻结 schema 的 `sourceAliases[]`（`data-model.md:15-17`）不一致。
-  3. 默认文件名 `report.json`（`first-slice.md:58`）与 `<slug>.dbxreport.json`（`architecture.md:135`）不一致。
-  4. M0 重开路径依赖 `host.openFilesystem`/拖入，但首版不申请 `host.filesystem` 且没有读取 API（`first-slice.md:22` vs `capabilities.md:112`）。
+  2. ~~首切片字段名 `connectionAlias` 与冻结 schema 的 `sourceAliases[]` 不一致。~~ 已修（2026-10-22）：first-slice 改用 `sourceAliases[]`。
+  3. ~~默认文件名 `report.json` 与 `<slug>.dbxreport.json` 不一致。~~ 已修（2026-10-22）：统一为 `<slug>.dbxreport.json`。
+  4. ~~M0 重开路径依赖 `host.openFilesystem`/拖入，但首版不申请 `host.filesystem` 且没有读取 API。~~ 已修（2026-10-22）：0.6.51 的 `fileTransfer.pick/read` 无需 manifest 权限；M0 打开改为 pick + 分块 read，拖入为增强；`openFilesystem` 只属 filesystem-provider，不使用。
   5. M1 退出条件 V8 是否属于门槛未统一（`roadmap.md:12` vs `test-strategy.md:110`）。
   6. V5 标 "M4+" 但 M4 范围/验收无 V5 条目。
   7. AI 在 MVP 承诺表中（可选）与"未拍板不得承诺 MVP"并存，需表述为"可选能力"。

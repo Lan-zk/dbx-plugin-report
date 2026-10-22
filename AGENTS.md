@@ -1,8 +1,8 @@
 # AGENTS.md
 
-> 项目：**dbx-report** — DBX 桌面插件，面向 SQL 作者的本地报表工具。作者写固定 SQL，把结果做成可重复打开的报表并组合成小看板；资产是本机 JSON 文件（`README.md`、`docs/README.md:10`）。
+> 项目：**dbx-plugin-report** — DBX 桌面插件，面向 SQL 作者的本地报表工具。作者写固定 SQL，把结果做成可重复打开的报表并组合成小看板；资产是本机 JSON 文件（`README.md`、`docs/README.md:10`）。
 >
-> 当前状态：只有 `README.md` + `docs/`（分析已完成），**M0 未开始**，D1–D5 范围决策**未书面拍板**（`docs/README.md:5`、`docs/development/roadmap.md:5`）。
+> 当前状态：`docs/`（分析完成）+ `prototype/`（P0 静态原型 v1，待确认）；**M0 未开始**，D1–D5 范围决策**未书面拍板**（`docs/README.md:5`、`docs/development/roadmap.md:5`）。推进方式见 `docs/development/delivery-plan.md`。
 >
 > 宿主基线：DBX `b160d130560f71c5c429be15cec6147f677a4b3a`（package 0.6.51），Host API 1.4.0，manifest v1，sidecar protocol v1。
 
@@ -10,7 +10,7 @@
 
 冲突时按此裁决：
 
-1. DBX 源码（本机 sibling `E:\File\self\github\dbx`，只读参考）：`crates/dbx-plugin-runtime/src/plugins/manifest.rs`、`crates/dbx-core/src/query/plugin_data.rs` 等。
+1. DBX 源码（同级 sibling `../dbx`，只读参考）：`crates/dbx-plugin-runtime/src/plugins/manifest.rs`、`crates/dbx-core/src/query/plugin_data.rs` 等。
 2. `plugins/manifest.schema.json`（创作契约，**不是**安全边界）。
 3. `plugins/README.md`、`plugins/SIGNING.md`、`plugins/RELEASING.md`。
 4. `docs/content/docs/plugin-development.mdx` 等上游文档。
@@ -18,15 +18,15 @@
 5. 本仓库 `.agents/rules/`、`.agents/skills/` 与 `docs/`（分析结论）。
 
 - 引用格式：`path:line` + 基线 commit；行号会漂移，引用前重核。
-- 本仓库 `docs/` 用 **F**（源码/一手规范可核对）、**I**（由 F 推导的裁决）、**H**（待运行验证的假设）标注；报告中的对象、阈值、验收标准是**拟定**，不是宿主现状（`docs/README.md:57-62`）。
+- 本仓库 `docs/` 用 **F**（源码/一手规范可核对）、**I**（由 F 推导的裁决）、**H**（待运行验证的假设）标注；报告中的对象、阈值、验收标准是**拟定**，不是宿主现状（`docs/README.md:60-63`）。
 - 不把博客、README、竞品功能清单当能力证明；"版本号支持"≠"能力可用"；没证据的结论标 H。
 
-## 2. 硬边界（任何里程碑都不得越过，`docs/README.md:47-55`）
+## 2. 硬边界（任何里程碑都不得越过，`docs/README.md:48-56`）
 
 1. 不实现、不承诺 DBX 宿主没有的 API；需要新增 Host API 的能力一律进"后续"，不当首版依赖。
 2. 不给插件加连接凭据复制、绕过 `host.data:read` 授权、或直接连数据库的旁路。
 3. 不把 SQL 参数做字符串拼接；首版不支持绑定参数与自由文本插值。
-4. 不把截断结果标记为完整结果；不做"导出全量 CSV"。
+4. 不把截断结果标记为完整结果；首版不做任何文件导出（含 CSV），也不做数据导入/解析。
 5. 不做跨连接 JOIN、后台调度、无人值守刷新、团队 ACL、自动发布。
 6. 不把 `host.storage` 或 tab 标题当资产库；正式资产是本机 JSON 文件。
 7. 不引入 sidecar（M0–M2 不需要）；如后续引入，必须另做信任边界评审。
@@ -43,7 +43,7 @@
 | 并发 | 宿主每 bridge 4 个 data query | 插件内队列 ≤2、看板 ≤20 卡（建议 ≤12）、显式排队 |
 | 元数据 | 只能按已知表取列，不能枚举/发现主外键 | 不做自动建模 |
 | 资产/存储 | `host.storage` 256 KiB/值、1 MiB、1024 键、无 CAS | 只存偏好/草稿，不存业务结果 |
-| 保存 | `saveFile` ≤512 MiB/次、每次弹框、取消返回 `null`、无读取 API | 重开靠用户选文件/拖入 |
+| 保存/读取 | `saveFile` ≤512 MiB/次、每次弹框、取消返回 `null`、**不返回路径**；读取经 `fileTransfer.pick`/拖入（无 manifest 权限，句柄上限 64） | 每次保存=另存为，不能写回原文件；重开靠用户选文件/拖入，不能按路径静默读 |
 | UI | iframe `allow-scripts`、opaque origin、CSP `default-src 'none'` | 无 Tauri/父 DOM/网络/Node；`localStorage` 抛异常 |
 
 关键规则：权限 ≠ 授权（`queryData` 每次重校验 grant）；`truncated=true` 只可样本预览；所有"完整/最新/已保存"字样必须有真实依据。详见 `.agents/rules/data-and-security.md`。
@@ -65,6 +65,10 @@
 - ADR-05：**已定（2026-10-22）** 技术栈 TypeScript + Vue 3.5 + 自研轻量组件 + Vite 8，单一前端包、无 sidecar、不引路由/状态库；版本基线 `docs/development/tech-stack.md:140`（§5 版本表，至 `:167`）。
 - ADR-06：**已定（2026-10-22，同日修订）** 看板布局用 12 列网格吸附；像素级自由画布不做。原"自研拖拽"部分已被 ADR-07 取代（`docs/product/decisions.md` ADR-06）。
 - ADR-07：**已定（2026-10-22）** 单看板 ≤20 卡（建议 ≤12）、最小卡片 2×3；布局引擎用 gridstack 14 + 官方 Vue wrapper（`tech-stack.md` TS-17、`architecture.md` §8.1）。"≤4 卡"是分析阶段的 MVP 假设，不是宿主限制。
+- ADR-08：**已定（2026-10-22）** 结果集是样本：过滤/排序/Top-N 只作用已取回行，`truncated` 时禁止总计/占比/其他桶；合计只认 SQL 标记行（`decisions.md` ADR-08、`analysis/reference-pitfalls.md` P1/P2）。
+- ADR-09：**已定（2026-10-22）** 报表口径绑定用 `basis:{queryHash,fieldsHash,confirmedAt}`，不用 `datasetVersionRef`；不一致标 stale 不静默更新；`formatVersion` 0.1（`decisions.md` ADR-09）。
+- ADR-10：**已定（2026-10-22）** 草稿只进 storage、恢复需确认；看板 `onOpenRefresh` 默认 false；`maxRows` 默认 500、>2000 警告；**首版不做任何文件导出（含 CSV），只查询+展示**（`decisions.md` ADR-10）。
+- ADR-11：**已定（2026-10-22，用户要求）** 原型先行：M0 之前插入 P0 静态 HTML 原型阶段，五屏确认后才进实现；原型不进产品包，但 `prototype/tokens.css`（宿主 token 镜像）与 `app.css`（组件类）直接演进为 `ui/styles/`（`decisions.md` ADR-11、`docs/development/prototype.md`）。
 - D1–D5：**待定**，会阻塞里程碑（目标用户 SQL 能力、文件式资产、AI 边界、首发库/规模、数据与许可政策）。决策门：D1/D2 进 M1 前，D4 M1 范围冻结前，D3 进 M3 前，D5 发布前（`roadmap.md:35-39`）。
 - **未拍板约束**：可以做 M0（不影响范围的技术验证），不得对外承诺 MVP 或排期 M1+（`decisions.md:75`、`roadmap.md:41`）。
 - 命名 `io.dbx.report` 是建议方案，未向 `t8y2/dbx-store` 确认；manifest id 发布后不可改。
@@ -124,12 +128,13 @@
 
 ## 7. 开发工作流
 
-1. 读 `.agents/rules/`（至少 `plugin-contract.md`、`data-and-security.md`；做产品取舍再读 `product-scope.md`）与 `docs/development/first-slice.md`。
-2. 只在 M0 范围内实现最小 UI-only workbench：打开 → 执行固定 SQL → 渲染 → 另存 JSON → 重开 → 再执行。
-3. 按 `docs/development/tech-stack.md`（TS-01~17）初始化工程：`dbx-plugin create dbx-report --template frontend` 生成 manifest/assets/打包配置，前端用 Vite + Vue 自建（`src/` → `ui/`）；`dbx-plugin dev` 迭代 UI（Node 22+，dev-host 无数据 API）；`dbx-plugin package` 出未签名 `.dbxp`。
-4. 真机：插件中心开启「Allow unsigned development packages」→ 本地安装 → 过真机检查点（`window.dbxPlugin`、`capabilities.dataApi`、授权弹框、取消保存、无 CSP/postMessage 报错）。
-5. 记录 `docs/development/records/<date>-m0.md`（环境、命令、脱敏截图、错误、图表库结论、go/no-go）；更新 roadmap 状态与 acceptance 签收。
-6. 需要平台操作细节时读 `.agents/skills/dbx-plugin-dev/`；查 DBX 数据库用 `.agents/skills/dbx/`。
+1. 读 `.agents/rules/`（至少 `plugin-contract.md`、`data-and-security.md`；做产品取舍再读 `product-scope.md`）、`docs/development/prototype.md`（原型确认结论）与 `docs/development/delivery-plan.md`（轮次节拍）。
+2. 先改原型再改代码：信息层级、文案口径、交互入口的调整，先在 `prototype/screens/*.html` 改并真实渲染检查，确认后才落到 `src/ui`；不接受「代码已经改了，原型文档没改」。
+3. 只在 M0 范围内实现最小 UI-only workbench：打开 → 执行固定 SQL → 渲染 → 另存 JSON → 重开 → 再执行。
+4. 按 `docs/development/tech-stack.md`（TS-01~17）初始化工程：`dbx-plugin create dbx-report --template frontend` 生成 manifest/assets/打包配置，前端用 Vite + Vue 自建（`src/` → `ui/`）；`dbx-plugin dev` 迭代 UI（Node 22+，dev-host 无数据 API）；`dbx-plugin package` 出未签名 `.dbxp`。
+5. 真机：插件中心开启「Allow unsigned development packages」→ 本地安装 → 过真机检查点（`window.dbxPlugin`、`capabilities.dataApi`、授权弹框、取消保存、无 CSP/postMessage 报错）。
+6. 记录 `docs/development/records/<date>-<round>-<slug>.md`（环境、命令、脱敏截图、错误、图表库结论、go/no-go）；更新 roadmap 状态与 acceptance 签收。
+7. 需要平台操作细节时读 `.agents/skills/dbx-plugin-dev/`；查 DBX 数据库用 `.agents/skills/dbx/`。
 
 ## 8. 测试与证据
 
@@ -140,8 +145,8 @@
 
 ## 9. 文档与规则维护
 
-- 文档地图与阅读顺序：`docs/README.md:12-20`（scope → capabilities/limits → roadmap/first-slice → architecture/data-model → test-strategy/acceptance → analysis → decisions/naming）。
-- 五条维护规则（`docs/README.md:64-70`）：宿主变化改 `docs/host/` 与证据索引并更新基线；范围变化先改 decisions 再改 roadmap；里程碑结束更新 acceptance/roadmap 状态；"已验证"必须附命令/环境/日期；技术选型/版本变更先改 `tech-stack.md`。
+- 文档地图与阅读顺序：`docs/README.md:12-20`（scope → capabilities/limits → roadmap/delivery-plan/prototype/first-slice → architecture/data-model → test-strategy/acceptance → analysis → decisions/naming）；接续前一会话时先读 `docs/handoff/` 最新一份。
+- 七条维护规则（`docs/README.md:67-73`）：宿主变化改 `docs/host/` 与证据索引并更新基线；范围变化先改 decisions 再改 roadmap；里程碑结束更新 acceptance/roadmap 状态；"已验证"必须附命令/环境/日期；技术选型/版本变更先改 `tech-stack.md`；每轮结论写 `docs/development/records/`、原型变化先改 `prototype.md` 再改实现。
 - 决策改动必须写日期、理由、替代方案、复议条件；影响范围的决策同步 scope 与 roadmap。
 - 本文件与 `.agents/rules/`、`.agents/skills/` 同步；规则以 `path:line` 为证，不复制 `docs/` 全文；过时规则删除，不留兼容层。
 

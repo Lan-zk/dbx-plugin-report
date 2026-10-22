@@ -18,8 +18,8 @@
 | 列连接 | `listConnections` / `getConnections` | `host.connections:read` |
 | 执行 SQL | `queryData`（固定 SQL，无参数） | `host.data:read` + 用户授权 |
 | 渲染 | 表格 + 一种图（柱状或折线），图表库打包进 UI | 无 |
-| 保存 | `saveFile` 写 JSON 定义 | 无独立权限 |
-| 重开 | 拖入 JSON（`onDrop`）或 `host.openFilesystem`（按实际 API） | 视 API；能不用 filesystem 就不用 |
+| 保存 | `saveFile` 写 JSON 定义（不返回路径；取消返回 `null`） | 无独立权限 |
+| 重开 | `capabilities.fileTransfer.pick` + 分块 `read`（≤5 MiB）；拖入 `onDrop` 作增强 | 无独立 manifest 权限；用户每次选择/拖入即授权 |
 | 偏好 | 可选 `host.storage` | `host.storage` |
 
 ## 3. 步骤与验收
@@ -41,6 +41,7 @@ dbx-plugin package --path ./dbx-report
 - 必须先确认连接 `connected=true`；未连接时提示用户先在 DBX 中打开。
 - `queryData({ connectionId, sql, maxRows: 500 })`；显示 `columns`/`rows`/`truncated`/`elapsedMs`。
 - 首次运行会弹授权；拒绝时显示可恢复错误，不崩溃。
+- 记录 `rows` 的 JSON 形态样例（整数/浮点/文本/NULL/日期/大整数），作为 M0 记录与 transport 契约的输入。
 
 **验收**：固定 SQL 返回预期行；`truncated` 能展示；拒绝授权有明确状态；点 Run 期间 UI 不阻塞 >1 秒。
 
@@ -54,19 +55,21 @@ dbx-plugin package --path ./dbx-report
 
 ### Step 3：保存 JSON
 
-- 定义最小对象：`formatVersion`、`documentId`、`savedAt`、`connectionAlias`、`dataset { sql, maxRows }`、`report { chartType, xField, yField }`；**不含凭据/连接 id 之外的业务数据**。
-- `saveFile` 写 UTF-8 字节；默认文件名 `report.json`。
+- 定义最小对象：`formatVersion`、`documentId`、`savedAt`、`sourceAliases[{id,label,dbType,database,schema}]`、`dataset { sql, maxRows }`、`report { chartType, xField, yField }`；**不含凭据/连接 id 之外的业务数据**。
+- `saveFile` 写 UTF-8 字节；默认文件名 `<slug>.dbxreport.json`（slug 由报表标题生成，无标题用 `report`）。
 - 用户取消保存 → 不显示“已保存”；保存失败 → 显示错误。
+- `saveFile` 不返回路径：只显示“已另存为 `<文件名>`”，不显示“已保存到原文件”；再次保存仍是另存为。
 
 **验收**：桌面弹出保存对话框；取消路径正确；生成文件可被独立打开并解析。
 
 ### Step 4：重开并重新取数
 
-- 通过拖入 JSON 或文件选择读取定义；校验 `formatVersion`；未知 major 拒绝并提示。
+- 打开：`capabilities.fileTransfer.pick`（桌面原生对话框 / web input fallback）→ 读 `meta.size`，>5 MiB 直接拒绝 → 逐块 `read(handleId, offset, 1 MiB)` 拼装 → `finally closeFileHandle`；拖入 JSON（`onDrop`）作增强入口，不作唯一入口。
+- 校验 `formatVersion`；未知 major 拒绝并提示；严格 `JSON.parse` + 最小 schema 校验。
 - 重新映射当前连接（保存的是别名，不是本机 id）；重新授权；重新执行；渲染。
 - 不保存结果数据，不假设保存时的连接仍存在。
 
-**验收**：换一个 DBX 实例/重启后仍能重开并取数；字段漂移/连接缺失有明确错误。
+**验收**：换一个 DBX 实例/重启后仍能重开并取数；pick 取消/超 5 MiB/非法 JSON/未知 major/连接缺失/字段漂移都有明确状态；打开后句柄回到基线（不泄漏）。
 
 ### Step 5：记录与 go/no-go
 
@@ -84,6 +87,7 @@ dbx-plugin package --path ./dbx-report
 全部满足才进入 M1：
 
 - [ ] 真机安装/打开/授权/查询/渲染/保存/重开全链路跑通；
+- [ ] 打开走 `fileTransfer.pick`+分块 read（拖入不可用不算阻断，但需记录）；打开失败（取消/超限/非法 JSON）不破坏当前文档；
 - [ ] 无未解决的 CSP/权限/沙箱阻塞；
 - [ ] 图表库可在无 `unsafe-eval`、无外部网络下工作，包体积可接受；
 - [ ] 保存取消、连接缺失、截断、SQL 被拒绝都有明确状态；
@@ -97,6 +101,7 @@ dbx-plugin package --path ./dbx-report
 | 图表库依赖 eval/worker 被 CSP 阻止 | 换轻量 SVG；仍不行则升级为“需宿主/渲染方案裁决”，不降低安全门槛 |
 | `queryData` 在真机不可用（capabilities 缺 dataApi） | 记录宿主版本/配置；确认是否版本过低或桌面/web 差异；必要时升级 DBX |
 | 保存对话框体验/文件重开不可接受 | 记录并触发 D2 复议；不要偷偷改用 storage 当资产库 |
+| `fileTransfer` 能力缺失或 `pick` 在真机不可用 | 记录能力位与宿主版本；M0 退化为“粘贴 JSON 文本导入”验证流程（文档不能重开=阻断 M1，须先解决 D2）；`onDrop` 仅桌面可用 |
 | 查询/渲染阻塞 UI | 记录耗时；拆分渲染或用 requestIdleCallback；仍不行则暂停 M1 设计 |
 | dev-host 无法覆盖数据路径 | 决定是否加 queryData mock；否则接受真机迭代成本 |
 
