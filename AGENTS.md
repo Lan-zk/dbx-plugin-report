@@ -40,7 +40,7 @@
 | SQL | 单条、只读分类、≤100000 字符 | 无多语句/临时表/写；只读≠无副作用 |
 | 超时 | 执行 timeout 上限 **60 s**，非端到端 deadline | 慢查询排队；关窗不取消服务端 |
 | 取消/分页/绑定 | **无** cancel、无 cursor、无 bind | "停止"只丢弃响应；不分页、不拼参数 |
-| 并发 | 宿主每 bridge 4 个 data query | 插件内队列 ≤2、看板 ≤4 卡、显式排队 |
+| 并发 | 宿主每 bridge 4 个 data query | 插件内队列 ≤2、看板 ≤20 卡（建议 ≤12）、显式排队 |
 | 元数据 | 只能按已知表取列，不能枚举/发现主外键 | 不做自动建模 |
 | 资产/存储 | `host.storage` 256 KiB/值、1 MiB、1024 键、无 CAS | 只存偏好/草稿，不存业务结果 |
 | 保存 | `saveFile` ≤512 MiB/次、每次弹框、取消返回 `null`、无读取 API | 重开靠用户选文件/拖入 |
@@ -61,11 +61,12 @@
 
 ## 5. 决策状态（必须原样保留）
 
-- ADR-01~04：**暂定**（SQL 为计算真相；作者写/审 SQL；AI 候选 + 人工确认；本机 JSON 为资产）。`docs/product/decisions.md:6-36`。
-- ADR-05：**已定（2026-10-22）** 技术栈 TypeScript + Vue 3.5 + 自研轻量组件 + Vite 8，单一前端包、无 sidecar、不引路由/状态库；版本基线 `docs/development/tech-stack.md:138-164`。
-- ADR-06：**已定（2026-10-22）** 看板布局用 12 列网格吸附 + 自研 Pointer Events/CSS Grid 拖拽；像素级自由画布与布局引擎不做（`docs/product/decisions.md:46-52`、`tech-stack.md` TS-17、`architecture.md` §8.1）。
+- ADR-01~04：**暂定**（SQL 为计算真相；作者写/审 SQL；AI 候选 + 人工确认；本机 JSON 为资产）。`docs/product/decisions.md:6`（ADR-01 起，至 `:36`）。
+- ADR-05：**已定（2026-10-22）** 技术栈 TypeScript + Vue 3.5 + 自研轻量组件 + Vite 8，单一前端包、无 sidecar、不引路由/状态库；版本基线 `docs/development/tech-stack.md:140`（§5 版本表，至 `:167`）。
+- ADR-06：**已定（2026-10-22，同日修订）** 看板布局用 12 列网格吸附；像素级自由画布不做。原"自研拖拽"部分已被 ADR-07 取代（`docs/product/decisions.md` ADR-06）。
+- ADR-07：**已定（2026-10-22）** 单看板 ≤20 卡（建议 ≤12）、最小卡片 2×3；布局引擎用 gridstack 14 + 官方 Vue wrapper（`tech-stack.md` TS-17、`architecture.md` §8.1）。"≤4 卡"是分析阶段的 MVP 假设，不是宿主限制。
 - D1–D5：**待定**，会阻塞里程碑（目标用户 SQL 能力、文件式资产、AI 边界、首发库/规模、数据与许可政策）。决策门：D1/D2 进 M1 前，D4 M1 范围冻结前，D3 进 M3 前，D5 发布前（`roadmap.md:35-39`）。
-- **未拍板约束**：可以做 M0（不影响范围的技术验证），不得对外承诺 MVP 或排期 M1+（`decisions.md:64`、`roadmap.md:41`）。
+- **未拍板约束**：可以做 M0（不影响范围的技术验证），不得对外承诺 MVP 或排期 M1+（`decisions.md:75`、`roadmap.md:41`）。
 - 命名 `io.dbx.report` 是建议方案，未向 `t8y2/dbx-store` 确认；manifest id 发布后不可改。
 - MVP 承诺表含折线图/数值卡，但 M1 只做 table/bar——属后续里程碑补齐，不得在 M1 宣称 MVP 达成。
 

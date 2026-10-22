@@ -25,12 +25,12 @@ src/
     core/dataset/           # 查询规格、run 编排、queryHash、截断、错误分类
     core/metric/            # 指标/维度词典、字段契约、口径校验
     core/report/            # viewSpec → 渲染模型、字段映射、筛选
-    core/dashboard/         # ≤4 报表、刷新队列、逐卡状态、部分失败
+    core/dashboard/         # ≤20 报表（建议≤12）、刷新队列、逐卡状态、部分失败、懒加载编排
     ai/draft/               # prompt、候选 JSON schema、校验、diff
     ui/workbench/           # 工作台外壳、文档切换、保存/打开
     ui/designer/            # 数据集/报表编辑器（表单 + 预览）
     ui/render/              # 图表适配器（ECharts 或 SVG）、表格、数值卡
-    ui/dashboard/           # 看板布局编辑：12 列网格、拖拽/缩放、碰撞、键盘与表单
+    ui/dashboard/           # 看板布局：gridstack 适配层（12 列网格）、尺寸预设、键盘与表单等价入口
     ui/components/          # 宿主 dbx-* 组件包装 + 自有小组件
     ui/state/               # 运行时 store（非资产）
 ```
@@ -124,10 +124,12 @@ src/
 
 ## 8.1 看板布局（M2）
 
-- `core/dashboard` 负责布局模型与校验（网格约束、碰撞推挤、增删迁移）；`ui/dashboard` 只做指针交互与渲染，不自己发明坐标。
-- 编辑模式才启用拖拽/缩放；阅读模式只渲染，不绑定 pointer 事件。
-- 拖拽/缩放期间暂停图表 resize，`pointerup` 后统一 resize；避免每帧 `chart.resize()` 打爆 §11 性能预算。
-- 输入等价性：拖拽/缩放、表单输入、键盘操作三条路径写回同一个 `layout` 模型；不允许只有指针一种入口。
+- `core/dashboard` 负责布局模型与校验（12 列网格约束、碰撞/紧凑、增删迁移、≤20 卡上限）；`ui/dashboard` 是 **gridstack 14 官方 Vue wrapper**（`gridstack/dist/vue`）的适配层，只做交互与渲染，不自己发明坐标。
+- 适配层职责：把 `layout[]` 映射成 `GridStackWidget[]`（`reportId` 走 `useWidgetSerializer` 持久化）；响应 `change`/`dragstop`/`resizestop` 防抖写回模型；主题 token 映射到卡片容器；卸载时 `grid.destroy()`。
+- 编辑模式才启用拖拽/缩放（`enable()`）；阅读模式 `setStatic(true)`，不绑定拖拽事件。
+- 输入等价性：拖拽/缩放、尺寸预设（1/3、1/2、2/3、整行 × 高 3/4/6/8）、表单输入、键盘（`Alt+方向` / `Alt+Shift+方向`）四条路径写回同一个 `layout` 模型；gridstack 只管指针路径，其余三条由 UI 层补齐。
+- 拖拽/缩放期间暂停图表 resize（`dragstart`/`resizestart` 禁用 `vue-echarts` autoresize），`dragstop`/`resizestop` 后统一 resize 一次；避免每帧 `chart.resize()` 打爆 §11 性能预算。
+- 20 卡性能：首屏只挂可见卡的图表（IntersectionObserver），离屏卡保留 DOM 不建实例；`columnOpts` 断点（窄容器塌缩为 1 列）只影响呈现，不改资产坐标。
 - 布局只影响呈现，不触发取数：改 `x/y/w/h` 不得引起 `queryData`；刷新仍由用户手动触发。
 
 ## 9. 文件与文档 I/O
@@ -153,6 +155,8 @@ src/
 | workbench 首屏 | <1 s（本地资源） |
 | 500 行表格渲染 | <200 ms；不阻塞主线程 >50 ms 连续 |
 | 500 点柱/折线 | <300 ms |
+| 20 卡看板首屏 | <1 s（仅渲染可见卡，图表懒挂载） |
+| 20 卡拖拽/缩放 | 60 fps（拖拽期间暂停图表 resize，稳定后统一重绘） |
 | 文档打开+校验（≤1 MiB） | <200 ms |
 | 内存（5000 行×20 列） | <100 MB 峰值 |
 | 包体积 | <5 MB（图表库另记）；超出需评审 |
@@ -171,6 +175,8 @@ src/
 语言/框架/依赖层面的选型已收敛，见 [tech-stack.md](tech-stack.md)（2026-10-22 定稿）。仍待定的设计问题：
 
 - 图表库：ECharts 6 按需注册为暂定方案，M0 实测 CSP/体积后定稿；不通过则退化到手写 SVG（tech-stack TS-09）。
+- 20 卡全刷时间预算（每卡 0.3–1.5 s、队列 ≤2）与“只刷可见”默认策略：M2 实测后定，不在 M1 承诺。
+- gridstack 官方 Vue wrapper 与 Vue 3.5/Vite 8 的兼容性、主题 token 映射、包增量：M0 H7–H9 实测。
 - 文档 revision/多 tab 冲突检测能做到什么程度（宿主未提供锁）。
 - 指标词典的字段漂移迁移交互。
 - AI 候选 diff 的展示粒度。

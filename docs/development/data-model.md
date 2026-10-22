@@ -146,9 +146,9 @@
 }
 ```
 
-- `reportRefs` 最多 4；同一连接（sourceAliasId 相同）才允许组合。
+- `reportRefs` 最多 **20**（UI 建议 ≤12；超过直接拒绝加载并提示拆分看板）；同一连接（sourceAliasId 相同）才允许组合。
 - `layout` 是 **12 列网格**坐标（单位是格，不是像素）：列宽由容器宽度自适应，行高/gap 是 UI 常量，不写入资产。
-- 约束：`x≥0, y≥0, w≥3, h≥4, x+w≤12`；`layout` 项与 `reportRefs` **一一对应**（不多不少）；**禁止重叠**（加载时校验）；允许空白格与留空行，不自动压成密集网格。
+- 约束：`x≥0, y≥0, w≥2, h≥3, x+w≤12`；`layout` 项与 `reportRefs` **一一对应**（不多不少）；**禁止重叠**（加载时校验）；允许空白格与留空行，不自动压成密集网格。
 - 编辑入口等价：拖拽/缩放与 `x/y/w/h` 表单输入写同一模型；像素坐标不进入资产（跨窗口宽度不可移植）。
 - 迁移：新增卡先找空位，没有则追加到 `y = max(y+h)`；删除卡同步删除 layout 项并提供"向上压缩"；`reportRefs` 与 `layout` 不一致 → 校验失败并提示修复，不自动猜。
 - `filterMappings` 只允许类型/口径一致的显式映射；不宣称“全库筛选”。
@@ -165,7 +165,7 @@
 
 1. `formatVersion` major 支持；未知字段保留但忽略（写回时保留，避免破坏未来字段）。
 2. 所有 ID 唯一且非空；`sourceAliases` 至少 1 个（除非纯草稿）。
-3. 引用完整性：dataset.sourceAliasId 存在；metric/dimension.datasetId 存在；report.datasetVersionRef 存在；dashboard.reportRefs 存在且 ≤4；dashboard.layout 与 reportRefs 一一对应，网格边界（`x+w≤12`、最小 3×4）合法且无重叠。
+3. 引用完整性：dataset.sourceAliasId 存在；metric/dimension.datasetId 存在；report.datasetVersionRef 存在；dashboard.reportRefs 存在且 ≤20；dashboard.layout 与 reportRefs 一一对应，网格边界（`x+w≤12`、最小 2×3）合法且无重叠。
 4. SQL：非空、无参数占位、单语句、长度 ≤100000；不做“只读”最终裁决。
 5. `maxRows` 1–5000；`timeoutMs` 0–60000。
 6. 字段契约：report 引用的 outputColumn 必须在 dataset.fields 中；类型兼容。
