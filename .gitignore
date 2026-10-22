@@ -1,0 +1,13 @@
+# 依赖与构建产物
+node_modules/
+dist/
+.vite/
+coverage/
+
+# 临时工作区（调研底稿等保留在本地）
+.tmp/
+
+# 编辑器与系统文件
+.DS_Store
+Thumbs.db
+*.log
