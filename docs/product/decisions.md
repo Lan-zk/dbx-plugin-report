@@ -35,6 +35,14 @@
 - **替代**：宿主资产 API/本地服务（需新增 Host API，另立项）。
 - **复议条件**：用户拒绝文件式体验且接受新增宿主资产 API 的成本 → 重新裁决。
 
+## ADR-05 技术栈：TypeScript + Vue 3.5 + 自研轻量组件
+
+- **状态**：已定（2026-10-22）
+- **决定**：单一 TypeScript 前端包，Vue 3.5 Composition API + `<script setup>`，Vite 8 构建；不引完整 UI 套件、不用 sidecar、不引路由/状态库；图表暂定 ECharts 6 按需，校验 Zod 4，具体版本见 [development/tech-stack.md](../development/tech-stack.md)。
+- **理由**：既有架构/安全论证已按 Vue 语义写（`architecture.md` §12、`release-and-security.md` T1），换框架会让论证与实现脱节；`plugin-development.mdx:947` 明确允许 self-managed Vue UI；自研组件避免主题 token 双体系与包体积超标；分层 `ui → core → platform` 使框架替换只需重写 `ui/`。
+- **替代**：Svelte 5（官方模板，生态/维护弱，保留为换层备选）；React 19（体积与心智不一致）；UI 套件（Element Plus/Naive UI）。
+- **复议条件**：团队维护者变化或 Vue 生态出现阻塞性缺陷 → 只重写 `ui/`，`core/`、`platform/` 不变；图表/校验等单点替换见 tech-stack §8。
+
 ## 待拍板决策（阻塞排期）
 
 | ID | 决策 | 建议默认 | 不接受时的后果 |

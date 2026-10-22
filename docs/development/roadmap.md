@@ -42,7 +42,7 @@ M3 (AI) 只在 M1 数据模型冻结后开始；不阻塞 M1/M2。
 
 ## M0 任务书
 
-见 [first-slice.md](first-slice.md)。M0 结束产出 `docs/development/records/<date>-m0.md`：环境、命令、观察、截图/日志、go/no-go、对路线图的修正。
+见 [first-slice.md](first-slice.md)。技术栈已定（2026-10-22）：TypeScript + Vue 3.5 + Vite 8 + 自研轻量组件，版本见 [tech-stack.md](tech-stack.md)；M0 需验证该文件 §7 的 6 项假设。M0 结束产出 `docs/development/records/<date>-m0.md`：环境、命令、观察、截图/日志、go/no-go、对路线图的修正。
 
 ## M1 范围（单报表竖切）
 

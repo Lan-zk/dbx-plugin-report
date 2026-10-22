@@ -29,7 +29,7 @@ dbx-plugin create dbx-report --template frontend
 dbx-plugin package --path ./dbx-report
 ```
 
-命令/模板以当前 CLI 为准；`plugins/README.md` 是宿主侧权威说明。打包产物为 `.dbxp`。
+`frontend` 模板只提供最小 `ui/index.html`（无构建），用于生成正确的 `manifest.json`/`assets/`/`dbx-plugin.toml`/打包配置。本仓库前端按 [tech-stack.md](tech-stack.md) 用 Vite + Vue 自建：保留模板的 manifest 与打包配置，`src/` 为源码，`vite build` 输出到 `ui/`（相对路径、`emptyOutDir` 谨慎），`assets/` 只放图标与静态资源。命令/模板以当前 CLI 为准；`plugins/README.md` 是宿主侧权威说明。打包产物为 `.dbxp`。
 
 ## 3. 真机安装与迭代（必须）
 
@@ -89,13 +89,14 @@ dbx-plugin dev --path ./dbx-report --port 5190
 
 ```bash
 pnpm install
-pnpm run typecheck
+pnpm run typecheck   # vue-tsc --noEmit（含 SFC）
+pnpm run lint        # ESLint + Prettier 检查
 pnpm run test        # 单元：schema、hash、队列、错误映射、格式化
-pnpm run build
+pnpm run build       # vite build → ui/
 pnpm run package     # 产出 .dbxp
 ```
 
-E2E/真机用例不在 CI 中自动跑；按 [testing/acceptance.md](../testing/acceptance.md) 手工执行并记录。
+Node ≥22.12（Vite 8 / Vitest 5 engine），版本基线见 [tech-stack.md](tech-stack.md) §5。E2E/真机用例不在 CI 中自动跑；按 [testing/acceptance.md](../testing/acceptance.md) 手工执行并记录。
 
 ## 7. 诊断与日志
 

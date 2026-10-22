@@ -2,7 +2,7 @@
 
 > **项目**：DBX 桌面插件，面向 SQL 作者的本地报表工具。  
 > **DBX 基线**：`b160d130560f71c5c429be15cec6147f677a4b3a`（main HEAD，package 版本 0.6.51），Host API 1.4.0，manifest v1，sidecar protocol v1。  
-> **文档状态**：可行性、能力边界、开发路线已完成分析；M0（walking skeleton）尚未开始；5 项范围决策尚未书面拍板。  
+> **文档状态**：可行性、能力边界、开发路线与技术选型已完成分析；M0（walking skeleton）尚未开始；5 项范围决策尚未书面拍板。  
 > **最后更新**：2026-10-22（Asia/Shanghai）。
 
 ## 一句话范围
@@ -14,7 +14,7 @@
 1. [product/scope.md](product/scope.md)：做什么、首版承诺什么、明确不做什么。
 2. [host/capabilities.md](host/capabilities.md) + [host/limits.md](host/limits.md)：宿主到底提供什么、硬限制是什么。
 3. [development/roadmap.md](development/roadmap.md) + [development/first-slice.md](development/first-slice.md)：按什么顺序做、第一件事是什么。
-4. [development/architecture.md](development/architecture.md) + [development/data-model.md](development/data-model.md)：模块、状态机、文档格式草案。
+4. [development/architecture.md](development/architecture.md) + [development/data-model.md](development/data-model.md) + [development/tech-stack.md](development/tech-stack.md)：模块、状态机、文档格式草案、语言/框架/依赖选型。
 5. [testing/test-strategy.md](testing/test-strategy.md) + [testing/acceptance.md](testing/acceptance.md)：怎么验、什么算通过。
 6. 需要论证依据时读 [analysis/feasibility-report.md](analysis/feasibility-report.md)（完整报告）和 [analysis/assessment.md](analysis/assessment.md)（对报告的评审与分歧）。
 7. 开工前确认 [product/decisions.md](product/decisions.md) 中的待拍板项；命名见 [product/naming.md](product/naming.md)。
@@ -24,7 +24,7 @@
 | 目录 | 文档 | 内容 |
 |---|---|---|
 | `product/` | `scope.md` | 产品定位、MVP、后续、非目标、成功/止损标准 |
-| | `decisions.md` | ADR-01~04、5 项待拍板决策、变更控制 |
+| | `decisions.md` | ADR-01~05、5 项待拍板决策、变更控制 |
 | | `naming.md` | 仓库名、manifest id、展示名、贡献点 id |
 | `host/` | `capabilities.md` | UI 通道、sidecar、贡献点、Host API、权限、安全模型 |
 | | `limits.md` | 硬限制速查 + 对 BI 的后果 + 误读澄清 |
@@ -37,6 +37,7 @@
 | | `architecture.md` | 模块划分、数据流、状态机、错误模型、并发 |
 | | `data-model.md` | 文档 JSON Schema v0 草案、指标词典、版本规则 |
 | | `dev-environment.md` | 脚手架、真机安装、dev-host、测试命令 |
+| | `tech-stack.md` | 语言、框架、UI、图表、校验、测试、工具链选型与版本基线 |
 | `testing/` | `test-strategy.md` | 测试分层、V1–V8、黄金数据、AI 评估集 |
 | | `acceptance.md` | 各里程碑验收门与签收模板 |
 | `operations/` | `release-and-security.md` | 打包签名、商店审核、威胁模型、隐私、许可 |
@@ -66,3 +67,4 @@
 2. 范围变化必须先改 `product/decisions.md`（新增 ADR 或修订待拍板项），再改 `development/roadmap.md`；禁止在里程碑里悄悄扩大范围。
 3. 每个里程碑结束时更新 `testing/acceptance.md` 的签收记录和 `development/roadmap.md` 的状态。
 4. 任何“已验证”的结论都必须附命令、环境、日期；未运行的验证保持 H 标记。
+5. 技术选型或版本基线变更时，先改 `development/tech-stack.md`（§5 版本表 + §9 变更记录），再改 `AGENTS.md` §7 与相关模块文档。
